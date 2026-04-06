@@ -8,7 +8,7 @@ export const SKILL_CONFIG = {
   fireball: {
     key: 'fireball',
     name: 'Fireball',
-    hotkey: 'Q',
+    hotkey: '1',
     damage: 20,
     cooldown: 1800,
     type: SKILL_TYPES.PROJECTILE,
@@ -19,7 +19,7 @@ export const SKILL_CONFIG = {
   lightning: {
     key: 'lightning',
     name: 'Lightning',
-    hotkey: 'W',
+    hotkey: '2',
     damage: 38,
     cooldown: 4200,
     type: SKILL_TYPES.AREA,
@@ -29,7 +29,7 @@ export const SKILL_CONFIG = {
   aura: {
     key: 'aura',
     name: 'Aura',
-    hotkey: 'E',
+    hotkey: '3',
     damage: 0,
     cooldown: 8000,
     type: SKILL_TYPES.BUFF,

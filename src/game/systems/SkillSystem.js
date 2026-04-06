@@ -46,9 +46,9 @@ export class SkillSystem {
     this.enemies = enemies;
     this.projectiles = this.scene.physics.add.group({ maxSize: 18 });
 
-    this.keys.fireball = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
-    this.keys.lightning = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
-    this.keys.aura = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.keys.fireball = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
+    this.keys.lightning = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
+    this.keys.aura = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE);
 
     ensureSkillTexture(this.scene, 'skill-fireball', SKILL_CONFIG.fireball.color);
 
@@ -169,6 +169,7 @@ export class SkillSystem {
     beam.strokePath();
 
     const spark = this.scene.add.circle(target.x, target.y, 16, config.color, 0.35).setDepth(9);
+    this.scene.visualEffects?.spawnImpact(target.x, target.y, config.color, 16);
     this.scene.tweens.add({
       targets: [beam, spark],
       alpha: 0,
@@ -277,6 +278,7 @@ export class SkillSystem {
 
     const flash = this.scene.add.circle(projectile.x, projectile.y, 14, SKILL_CONFIG.fireball.color, 0.35);
     flash.setDepth(9);
+    this.scene.visualEffects?.spawnImpact(projectile.x, projectile.y, SKILL_CONFIG.fireball.color, 14);
     this.scene.tweens.add({
       targets: flash,
       alpha: 0,
@@ -296,7 +298,7 @@ export class SkillSystem {
     return true;
   }
 
-  getHudLines(time = this.scene.time.now) {
+  getStatusSnapshot(time = this.scene.time.now) {
     const formatCooldown = (skillKey) => {
       const remaining = Math.max(0, (this.cooldowns[skillKey] ?? 0) - time);
       return remaining > 0 ? `${(remaining / 1000).toFixed(1)}s` : 'OK';
@@ -304,9 +306,20 @@ export class SkillSystem {
 
     const auraRemaining = this.activeAura ? Math.max(0, Math.ceil((this.activeAura.endsAt - time) / 1000)) : 0;
 
+    return {
+      fireball: formatCooldown('fireball'),
+      lightning: formatCooldown('lightning'),
+      aura: formatCooldown('aura'),
+      auraActive: auraRemaining > 0 ? `${auraRemaining}s` : 'OFF',
+    };
+  }
+
+  getHudLines(time = this.scene.time.now) {
+    const status = this.getStatusSnapshot(time);
+
     return [
-      `Skills Q:${formatCooldown('fireball')}  W:${formatCooldown('lightning')}  E:${formatCooldown('aura')}`,
-      `Aura ${auraRemaining > 0 ? `${auraRemaining}s ativa` : 'inativa'}`,
+      `Skills 1:${status.fireball}  2:${status.lightning}  3:${status.aura}`,
+      `Aura ${status.auraActive !== 'OFF' ? `${status.auraActive} ativa` : 'inativa'}`,
     ];
   }
 

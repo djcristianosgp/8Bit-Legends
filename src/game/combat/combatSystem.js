@@ -58,6 +58,8 @@ export const performPlayerAttack = ({
       enemy.healthBar.update();
     }
 
+    scene.visualEffects?.spawnImpact(enemy.x, enemy.y, 0xffc36b, 10);
+
     if (isDead(enemy.stats)) {
       onEnemyDefeated(enemy);
       enemy.healthBar?.destroy();
@@ -69,6 +71,7 @@ export const performPlayerAttack = ({
 
   const flash = scene.add.circle(player.x, player.y, ATTACK_RANGE, 0xffd166, 0.2);
   flash.setDepth(8);
+  scene.visualEffects?.spawnImpact(player.x, player.y, 0xffd166, ATTACK_RANGE / 1.7);
   scene.tweens.add({
     targets: flash,
     alpha: 0,

@@ -61,6 +61,11 @@ export class ArrowSystem {
         return;
       }
 
+      if (!arrow.lastTrailAt || time - arrow.lastTrailAt >= 70) {
+        arrow.lastTrailAt = time;
+        this.scene.visualEffects?.spawnArrowTrail(arrow.x, arrow.y);
+      }
+
       // Verifica se o alvo ainda está vivo
       if (arrow.target && arrow.target.active && !isDead(arrow.target.stats)) {
         this.updateArrowTracking(arrow, arrow.target);
@@ -195,6 +200,7 @@ export class ArrowSystem {
     // Efeito visual
     const flash = this.scene.add.circle(arrow.x, arrow.y, 12, 0xffd700, 0.4);
     flash.setDepth(1);
+    this.scene.visualEffects?.spawnImpact(arrow.x, arrow.y, 0xffd700, 12);
     this.scene.tweens.add({
       targets: flash,
       alpha: 0,

@@ -20,6 +20,7 @@ export class ShieldSystem {
     this.isActive = false;
     this.isOnCooldown = false;
     this.shieldVisual = null;
+    this.shieldGlow = null;
     this.cooldownTimerEvent = null;
     this.durationTimerEvent = null;
     this.shieldKey = null;
@@ -39,10 +40,14 @@ export class ShieldSystem {
     );
 
     // Cria o visual do escudo (círculo)
-    this.shieldVisual = this.scene.add.circle(0, 0, SHIELD_RADIUS, 0x4eb3f5, 0.3);
+    this.shieldVisual = this.scene.add.circle(0, 0, SHIELD_RADIUS, 0x4eb3f5, 0.22);
     this.shieldVisual.setDepth(1);
+    this.shieldVisual.setStrokeStyle(2, 0x7ad9ff, 0.9);
     this.shieldVisual.setVisible(false);
-    this.shieldVisual.setScrollFactor(0, 0); // Scroll com a câmera
+
+    this.shieldGlow = this.scene.add.circle(0, 0, SHIELD_RADIUS + 8, 0x7ad9ff, 0.1);
+    this.shieldGlow.setDepth(0.95);
+    this.shieldGlow.setVisible(false);
   }
 
   /**
@@ -56,6 +61,7 @@ export class ShieldSystem {
     // Posiciona o visual do escudo sobre o player
     if (this.shieldVisual && this.isActive) {
       this.shieldVisual.setPosition(this.player.x, this.player.y);
+      this.shieldGlow?.setPosition(this.player.x, this.player.y);
     }
 
     // Verifica se o jogador pressionou SHIFT para ativar
@@ -88,6 +94,7 @@ export class ShieldSystem {
     // Mostra o visual
     if (this.shieldVisual) {
       this.shieldVisual.setVisible(true);
+      this.shieldGlow?.setVisible(true);
       this.startShieldPulseAnimation();
     }
 
@@ -121,6 +128,7 @@ export class ShieldSystem {
 
     if (this.shieldVisual) {
       this.shieldVisual.setVisible(false);
+      this.shieldGlow?.setVisible(false);
     }
 
     if (this.durationTimerEvent) {
@@ -175,23 +183,37 @@ export class ShieldSystem {
 
     // Remove tweens anteriores
     this.scene.tweens.killTweensOf(this.shieldVisual);
+    if (this.shieldGlow) {
+      this.scene.tweens.killTweensOf(this.shieldGlow);
+    }
 
     // Animação de pulse contínua enquanto estiver ativo
     this.scene.tweens.add({
       targets: this.shieldVisual,
-      scale: [1, 1.15, 1],
+      scale: [1, 1.12, 1],
       duration: 800,
-      repeat: -1, // Loop infinito
+      repeat: -1,
       yoyo: false,
     });
 
     this.scene.tweens.add({
       targets: this.shieldVisual,
-      alpha: [0.3, 0.6, 0.3],
+      alpha: [0.2, 0.42, 0.2],
       duration: 800,
       repeat: -1,
       yoyo: false,
     });
+
+    if (this.shieldGlow) {
+      this.scene.tweens.add({
+        targets: this.shieldGlow,
+        scale: [1, 1.18, 1],
+        alpha: [0.08, 0.2, 0.08],
+        duration: 900,
+        repeat: -1,
+        yoyo: false,
+      });
+    }
   }
 
   /**
@@ -297,6 +319,10 @@ export class ShieldSystem {
 
     if (this.shieldVisual) {
       this.shieldVisual.destroy();
+    }
+
+    if (this.shieldGlow) {
+      this.shieldGlow.destroy();
     }
 
     if (this.shieldKey) {

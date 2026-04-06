@@ -7,12 +7,16 @@ const BOSS_BAR_HEIGHT = 8;
 
 const drawBar = (graphics, x, y, width, height, percent, colors) => {
   graphics.clear();
+  graphics.fillStyle(0x05080d, 0.24);
+  graphics.fillRect(x + 2, y + 2, width, height);
   graphics.fillStyle(colors.background, 0.95);
-  graphics.fillRect(x, y, width, height);
+  graphics.fillRoundedRect(x, y, width, height, 4);
   graphics.fillStyle(colors.fill, 1);
-  graphics.fillRect(x + 2, y + 2, (width - 4) * percent, height - 4);
+  graphics.fillRoundedRect(x + 2, y + 2, (width - 4) * percent, height - 4, 3);
+  graphics.fillStyle(0xffffff, 0.08);
+  graphics.fillRoundedRect(x + 2, y + 2, (width - 4) * percent, Math.max(3, (height - 4) / 2), 3);
   graphics.lineStyle(2, colors.border, 1);
-  graphics.strokeRect(x, y, width, height);
+  graphics.strokeRoundedRect(x, y, width, height, 4);
 };
 
 export const createPlayerHealthBar = (scene, stats) => {
@@ -32,7 +36,7 @@ export const createPlayerHealthBar = (scene, stats) => {
     const percent = stats.health / stats.maxHealth;
     drawBar(graphics, 50, 10, PLAYER_BAR_WIDTH, PLAYER_BAR_HEIGHT, percent, {
       background: 0x1c2130,
-      fill: 0x7adf74,
+      fill: percent < 0.28 ? 0xff7e6b : 0x7adf74,
       border: 0xe7b95a,
     });
   };
@@ -68,7 +72,7 @@ export const attachEnemyHealthBar = (scene, enemy) => {
     drawBar(graphics, x, y, barW, barH, percent, {
       background: 0x161b27,
       fill: isBoss ? 0xff6f4a : 0xeb7272,
-      border: isBoss ? 0x6b1a0f : 0x242b39,
+      border: isBoss ? 0x6b1a0f : 0x3a4158,
     });
   };
 

@@ -14,6 +14,8 @@ import { ShieldSystem } from '../systems/ShieldSystem';
 import { SkillSystem } from '../systems/SkillSystem';
 import { WeaponSystem } from '../systems/WeaponSystem';
 import { LootSystem } from '../systems/LootSystem';
+import { AmbienceSystem } from '../systems/AmbienceSystem';
+import { VisualEffectsSystem } from '../systems/VisualEffectsSystem';
 import { createInventory, addItemToInventory } from '../items/inventory';
 import { ITEM_CONFIG } from '../items/itemDefinitions';
 import { applyItemEffect } from '../items/itemEffects';
@@ -73,6 +75,8 @@ export class MainScene extends Phaser.Scene {
     this.skillSystem = null;
     this.weaponSystem = null;
     this.lootSystem = null;
+    this.ambienceSystem = null;
+    this.visualEffects = null;
   }
 
   /**
@@ -136,9 +140,18 @@ export class MainScene extends Phaser.Scene {
     this.physics.add.collider(this.player, mapState.wallLayer);
     this.playerHealthBar = createPlayerHealthBar(this, this.player.stats);
 
+    this.visualEffects = new VisualEffectsSystem(this);
+    this.visualEffects.create(this.player);
+
     this.weaponSystem = new WeaponSystem(this);
     this.weaponSystem.create(this.player);
     this.lootSystem = new LootSystem(this);
+    this.ambienceSystem = new AmbienceSystem(this);
+    this.ambienceSystem.create({
+      player: this.player,
+      worldSize: this.worldSize,
+      phase: this.startPhase,
+    });
 
     // ── HUD: inventário ────────────────────────────────────────────────────
     this.inventory = createInventory();
@@ -249,7 +262,8 @@ export class MainScene extends Phaser.Scene {
     // ── Câmera ─────────────────────────────────────────────────────────────
     const camera = this.cameras.main;
     camera.setBounds(0, 0, this.worldSize.width, this.worldSize.height);
-    camera.startFollow(this.player, true, 0.15, 0.15);
+    camera.setZoom(1.08);
+    camera.startFollow(this.player, true, 0.12, 0.12);
     camera.roundPixels = true;
 
     // ── Controles ──────────────────────────────────────────────────────────
@@ -277,8 +291,12 @@ export class MainScene extends Phaser.Scene {
       this.arrowSystem?.destroy();
       this.shieldSystem?.destroy();
       this.skillSystem?.destroy();
+      this.ambienceSystem?.destroy();
+      this.visualEffects?.destroy();
       this.weaponSystem = null;
       this.lootSystem = null;
+      this.ambienceSystem = null;
+      this.visualEffects = null;
     });
 
     // Auto-save a cada 30s (só quando o player está vivo)
@@ -335,7 +353,8 @@ export class MainScene extends Phaser.Scene {
     const velY = (moveY / len) * speed;
     this.player.body.setVelocity(velX, velY);
 
-    this.updateAnimation(moveX !== 0 || moveY !== 0);
+    const isMoving = moveX !== 0 || moveY !== 0;
+    this.updateAnimation(isMoving);
 
     if (time - this.lastEnemyUpdateAt >= ENEMY_UPDATE_INTERVAL_MS) {
       this.lastEnemyUpdateAt = time;
@@ -348,6 +367,8 @@ export class MainScene extends Phaser.Scene {
     this.arrowSystem?.update(time, this.player, this.enemies);
     this.shieldSystem?.update(time);
     this.skillSystem?.update(time, this.player, this.enemies, this.facing);
+    this.ambienceSystem?.update(time);
+    this.visualEffects?.update(time, isMoving, this.facing);
 
     if (time - this.lastStatePublishAt >= STATE_PUBLISH_INTERVAL_MS) {
       this.lastStatePublishAt = time;
@@ -531,7 +552,7 @@ export class MainScene extends Phaser.Scene {
     const speedTotal = getMoveSpeed(this.player.stats, PLAYER_SPEED);
     const weaponLabel = this.weaponSystem?.getWeaponLabel() ?? 'Common Sword [melee]';
     const skillLines = this.skillSystem?.getHudLines(this.time.now) ?? [
-      'Skills Q:--  W:--  E:--',
+      'Skills 1:--  2:--  3:--',
       'Aura inativa',
     ];
 
@@ -574,12 +595,21 @@ export class MainScene extends Phaser.Scene {
   }
 
   publishSharedState(statusLabel) {
+    const skillSnapshot = this.skillSystem?.getStatusSnapshot(this.time.now) ?? {
+      fireball: 'OK',
+      lightning: 'OK',
+      aura: 'OK',
+      auraActive: 'OFF',
+    };
+
     const snapshot = {
       playerName: this.playerName,
       phase: this.startPhase,
       hp: this.player.stats.health,
       maxHp: this.player.stats.maxHealth,
       status: statusLabel,
+      weaponLabel: this.weaponSystem?.getWeaponLabel() ?? 'Common Sword [melee]',
+      skills: skillSnapshot,
       inventory: {
         health: this.inventory.health,
         strength: this.inventory.strength,

@@ -20,6 +20,8 @@ function App() {
     hp: 100,
     maxHp: 100,
     status: 'Aguardando inicio',
+    weaponLabel: 'Common Sword [melee]',
+    skills: { fireball: 'OK', lightning: 'OK', aura: 'OK', auraActive: 'OFF' },
     inventory: { health: 0, strength: 0, speed: 0 },
   });
   const [mobileInput, setMobileInput] = useState({
@@ -168,15 +170,28 @@ function App() {
       {started && (
         <section className="hud-panel" aria-label="HUD externo">
           <div className="hud-main">
-            <strong>{hud.playerName}</strong>
-            <span>Fase {hud.phase}</span>
-            <span>Status: {hud.status}</span>
+            <strong className="hud-name">{hud.playerName}</strong>
+            <span className="hud-chip">Fase {hud.phase}</span>
+            <span className="hud-chip">Status: {hud.status}</span>
+            <span className="hud-chip">⚔ {hud.weaponLabel}</span>
           </div>
           <div className="hud-life" aria-label="Vida do jogador">
             <span>Vida {hud.hp}/{hud.maxHp}</span>
             <div className="hud-life-bar">
               <div className="hud-life-fill" style={{ width: `${hpPercent}%` }} />
             </div>
+          </div>
+          <div className="hud-skill-row" aria-label="Skills e cooldowns">
+            <span className={`hud-skill ${hud.skills.fireball === 'OK' ? 'hud-skill--ready' : 'hud-skill--cooldown'}`}>
+              1 Fireball {hud.skills.fireball}
+            </span>
+            <span className={`hud-skill ${hud.skills.lightning === 'OK' ? 'hud-skill--ready' : 'hud-skill--cooldown'}`}>
+              2 Lightning {hud.skills.lightning}
+            </span>
+            <span className={`hud-skill ${hud.skills.aura === 'OK' ? 'hud-skill--ready' : 'hud-skill--cooldown'}`}>
+              3 Aura {hud.skills.aura}
+            </span>
+            <span className="hud-skill">Aura ativa: {hud.skills.auraActive}</span>
           </div>
         </section>
       )}

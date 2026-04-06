@@ -4,6 +4,13 @@ const cloneHudState = (state) => ({
   hp: state.hp,
   maxHp: state.maxHp,
   status: state.status,
+  weaponLabel: state.weaponLabel,
+  skills: {
+    fireball: state.skills.fireball,
+    lightning: state.skills.lightning,
+    aura: state.skills.aura,
+    auraActive: state.skills.auraActive,
+  },
   inventory: {
     health: state.inventory.health,
     strength: state.inventory.strength,
@@ -22,6 +29,13 @@ export const createGameStateStore = (initialState) => {
     hp: initialState?.hp ?? 100,
     maxHp: initialState?.maxHp ?? 100,
     status: initialState?.status ?? 'Explorando',
+    weaponLabel: initialState?.weaponLabel ?? 'Common Sword [melee]',
+    skills: {
+      fireball: initialState?.skills?.fireball ?? 'OK',
+      lightning: initialState?.skills?.lightning ?? 'OK',
+      aura: initialState?.skills?.aura ?? 'OK',
+      auraActive: initialState?.skills?.auraActive ?? 'OFF',
+    },
     inventory: {
       health: initialState?.inventory?.health ?? 0,
       strength: initialState?.inventory?.strength ?? 0,
@@ -45,6 +59,10 @@ export const createGameStateStore = (initialState) => {
       current = {
         ...current,
         ...patchData,
+        skills: {
+          ...current.skills,
+          ...(patchData.skills ?? {}),
+        },
         inventory: {
           ...current.inventory,
           ...(patchData.inventory ?? {}),
