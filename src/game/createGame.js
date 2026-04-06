@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { createGameConfig } from './config';
+import { createSaveBridge } from './save/saveBridge';
 
 export const createGame = (parentElement) => {
-  return new Phaser.Game(createGameConfig(parentElement));
+  const game = new Phaser.Game(createGameConfig(parentElement));
+  const saveBridge = createSaveBridge(game);
+  return { game, saveBridge };
 };

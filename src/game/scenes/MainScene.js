@@ -31,6 +31,7 @@ export class MainScene extends Phaser.Scene {
     this.itemDrops = null;
     this.inventory = null;
     this.inventoryText = null;
+    this.currentMapId = null;
   }
 
   preload() {
@@ -43,7 +44,8 @@ export class MainScene extends Phaser.Scene {
   }
 
   create() {
-    const mapState = loadMap(this, DEFAULT_MAP_ID);
+    this.currentMapId = DEFAULT_MAP_ID;
+    const mapState = loadMap(this, this.currentMapId);
     this.worldSize = mapState.worldSize;
 
     createPlayerAnimations(this);
@@ -100,6 +102,18 @@ export class MainScene extends Phaser.Scene {
       this.enemies?.children.iterate((enemy) => enemy?.healthBar?.destroy());
       this.inventoryText?.destroy();
     });
+
+    this.time.addEvent({
+      delay: 30_000,
+      loop: true,
+      callback: () => {
+        if (this.player?.active && !isDead(this.player.stats)) {
+          this.game.events.emit('save-trigger');
+        }
+      },
+    });
+
+    this.game.events.emit('scene-ready', this);
   }
 
   update(time) {
@@ -267,6 +281,30 @@ export class MainScene extends Phaser.Scene {
     if (this.player.anims.currentAnim?.key !== targetAnim) {
       this.player.anims.play(targetAnim, true);
     }
+  }
+
+  applySave(data) {
+    const safeNum = (v, min, max) => Math.min(Math.max(Number(v) || 0, min), max);
+    const VALID_FACINGS = ['down', 'up', 'left', 'right'];
+
+    const maxHp = safeNum(data.player.stats.maxHealth, 1, 9999);
+    this.player.stats.maxHealth = maxHp;
+    this.player.stats.health = safeNum(data.player.stats.health, 1, maxHp);
+    this.player.stats.attack = safeNum(data.player.stats.attack, 0, 999);
+    this.player.stats.defense = safeNum(data.player.stats.defense, 0, 999);
+    this.player.stats.bonusAttack = safeNum(data.player.stats.bonusAttack, 0, 999);
+    this.player.stats.bonusSpeed = safeNum(data.player.stats.bonusSpeed, 0, 999);
+
+    this.player.x = safeNum(data.player.x, 0, this.worldSize.width);
+    this.player.y = safeNum(data.player.y, 0, this.worldSize.height);
+    this.facing = VALID_FACINGS.includes(data.player.facing) ? data.player.facing : 'down';
+
+    this.inventory.health = safeNum(data.inventory.health, 0, 9999);
+    this.inventory.strength = safeNum(data.inventory.strength, 0, 9999);
+    this.inventory.speed = safeNum(data.inventory.speed, 0, 9999);
+
+    this.playerHealthBar?.update();
+    this.updateInventoryHud();
   }
 
   handleResize(gameSize) {
