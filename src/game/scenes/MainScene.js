@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
 import { createPlayer } from '../entities/createPlayer';
 import { createPlayerAnimations, PLAYER_ANIMS } from '../animations/playerAnimations';
+import { DEFAULT_MAP_ID } from '../maps/mapRegistry';
+import { loadMap } from '../maps/loadMap';
 
 const PLAYER_SPEED = 180;
-const PLAYER_HALF_WIDTH = 10;
-const PLAYER_HALF_HEIGHT = 14;
 
 export class MainScene extends Phaser.Scene {
   constructor() {
@@ -13,6 +13,7 @@ export class MainScene extends Phaser.Scene {
     this.cursors = null;
     this.wasd = null;
     this.facing = 'down';
+    this.worldSize = { width: 0, height: 0 };
   }
 
   preload() {
@@ -20,18 +21,23 @@ export class MainScene extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 32,
     });
+
+    this.load.image('tiles-rpg', '/assets/tiles/rpg_tileset.png');
   }
 
   create() {
-    const width = this.scale.width;
-    const height = this.scale.height;
-
-    this.physics.world.setBounds(0, 0, width, height);
-    this.cameras.main.setBounds(0, 0, width, height);
+    const mapState = loadMap(this, DEFAULT_MAP_ID);
+    this.worldSize = mapState.worldSize;
 
     createPlayerAnimations(this);
-    this.player = createPlayer(this, width / 2, height / 2);
+    this.player = createPlayer(this, mapState.spawnPoint.x, mapState.spawnPoint.y);
     this.player.anims.play(PLAYER_ANIMS.idleDown, true);
+    this.physics.add.collider(this.player, mapState.wallLayer);
+
+    const camera = this.cameras.main;
+    camera.setBounds(0, 0, this.worldSize.width, this.worldSize.height);
+    camera.startFollow(this.player, true, 0.15, 0.15);
+    camera.roundPixels = true;
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys({
@@ -116,22 +122,12 @@ export class MainScene extends Phaser.Scene {
   handleResize(gameSize) {
     const { width, height } = gameSize;
 
-    this.physics.world.setBounds(0, 0, width, height);
-    this.cameras.main.setBounds(0, 0, width, height);
-
-    if (!this.player) {
-      return;
-    }
-
-    this.player.x = Phaser.Math.Clamp(
-      this.player.x,
-      PLAYER_HALF_WIDTH,
-      width - PLAYER_HALF_WIDTH,
+    this.cameras.main.setBounds(
+      0,
+      0,
+      this.worldSize.width,
+      this.worldSize.height,
     );
-    this.player.y = Phaser.Math.Clamp(
-      this.player.y,
-      PLAYER_HALF_HEIGHT,
-      height - PLAYER_HALF_HEIGHT,
-    );
+    this.cameras.main.setSize(width, height);
   }
 }

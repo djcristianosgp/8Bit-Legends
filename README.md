@@ -11,7 +11,10 @@ Projeto de jogo web com React (Vite) e Phaser.js.
 - Movimento limitado aos limites da tela
 - Codigo separado em arquivos com responsabilidades claras
 - Sprites organizados em `public/assets/sprites`
+- Tileset organizado em `public/assets/tiles`
 - Animacoes de `idle` e `walking` para 4 direcoes
+- Mapa top-down com tiles e paredes com colisao
+- Camera centralizada no player
 - Preparado para deploy na Vercel (`vercel.json`)
 - Layout responsivo e leve
 - `.gitignore` configurado
@@ -23,10 +26,18 @@ public/
   assets/
     sprites/
       player_sheet.png
+    tiles/
+      rpg_tileset.png
 src/
   game/
     animations/
       playerAnimations.js
+    maps/
+      definitions/
+        starterFieldMap.js
+      loadMap.js
+      mapConstants.js
+      mapRegistry.js
     config.js
     createGame.js
     entities/
@@ -60,3 +71,9 @@ npm run preview
 4. Output directory: `dist`.
 
 O arquivo `vercel.json` ja contempla rewrite para SPA.
+
+## Evolucao para multiplos mapas
+
+- Defina novos mapas em `src/game/maps/definitions`.
+- Registre o mapa em `src/game/maps/mapRegistry.js`.
+- Carregue pelo `mapId` na cena usando `loadMap`.
