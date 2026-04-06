@@ -18,20 +18,22 @@ const drawBar = (graphics, x, y, width, height, percent, colors) => {
 export const createPlayerHealthBar = (scene, stats) => {
   const graphics = scene.add.graphics().setScrollFactor(0).setDepth(30);
   const label = scene.add
-    .text(14, 10, 'HP', {
+    .text(14, 10, 'LIFE', {
       fontFamily: 'Trebuchet MS, sans-serif',
-      fontSize: '14px',
-      color: '#f8f3e6',
+      fontSize: '13px',
+      color: '#f5e8bc',
+      stroke: '#1a1624',
+      strokeThickness: 3,
     })
     .setScrollFactor(0)
     .setDepth(31);
 
   const update = () => {
     const percent = stats.health / stats.maxHealth;
-    drawBar(graphics, 44, 10, PLAYER_BAR_WIDTH, PLAYER_BAR_HEIGHT, percent, {
-      background: 0x2a2238,
-      fill: 0x5fd389,
-      border: 0xf4c25b,
+    drawBar(graphics, 50, 10, PLAYER_BAR_WIDTH, PLAYER_BAR_HEIGHT, percent, {
+      background: 0x1c2130,
+      fill: 0x7adf74,
+      border: 0xe7b95a,
     });
   };
 
@@ -64,9 +66,9 @@ export const attachEnemyHealthBar = (scene, enemy) => {
     const y = enemy.y + yOffset;
 
     drawBar(graphics, x, y, barW, barH, percent, {
-      background: 0x1f1f27,
-      fill: isBoss ? 0xff3333 : 0xde5f5f,
-      border: isBoss ? 0x880000 : 0x22222a,
+      background: 0x161b27,
+      fill: isBoss ? 0xff6f4a : 0xeb7272,
+      border: isBoss ? 0x6b1a0f : 0x242b39,
     });
   };
 

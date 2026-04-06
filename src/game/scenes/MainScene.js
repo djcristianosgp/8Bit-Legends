@@ -119,11 +119,11 @@ export class MainScene extends Phaser.Scene {
     // ── HUD: inventário ────────────────────────────────────────────────────
     this.inventory = createInventory();
     this.inventoryText = this.add
-      .text(14, 34, '', {
+      .text(14, 96, '', {
         fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '13px',
-        color: '#f8f3e6',
-        stroke: '#1b1f2d',
+        fontSize: '12px',
+        color: '#f2e7cc',
+        stroke: '#171b27',
         strokeThickness: 3,
       })
       .setScrollFactor(0)
@@ -134,9 +134,9 @@ export class MainScene extends Phaser.Scene {
     this.phaseText = this.add
       .text(this.scale.width - 14, 10, '', {
         fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '14px',
-        color: '#f4c25b',
-        stroke: '#1b1f2d',
+        fontSize: '13px',
+        color: '#f0c46b',
+        stroke: '#171b27',
         strokeThickness: 4,
       })
       .setScrollFactor(0)
@@ -145,22 +145,22 @@ export class MainScene extends Phaser.Scene {
     this.updatePhaseHud();
 
     this.playerNameText = this.add
-      .text(14, 58, `Jogador: ${this.playerName}`, {
+      .text(14, 60, `Nome ${this.playerName}`, {
         fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '13px',
-        color: '#9ed3ff',
-        stroke: '#1b1f2d',
+        fontSize: '12px',
+        color: '#a8d7ff',
+        stroke: '#171b27',
         strokeThickness: 3,
       })
       .setScrollFactor(0)
       .setDepth(31);
 
     this.statusText = this.add
-      .text(14, 76, 'Status: Explorando', {
+      .text(14, 78, 'Status Explorando', {
         fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '13px',
+        fontSize: '12px',
         color: '#bde5b8',
-        stroke: '#1b1f2d',
+        stroke: '#171b27',
         strokeThickness: 3,
       })
       .setScrollFactor(0)
@@ -481,7 +481,7 @@ export class MainScene extends Phaser.Scene {
     this.socketSync?.publishLocalState(snapshot);
 
     if (this.statusText) {
-      this.statusText.setText(`Status: ${statusLabel}`);
+      this.statusText.setText(`Status ${statusLabel}`);
       this.statusText.setColor(statusLabel === 'Boss Fight' ? '#ff9090' : '#bde5b8');
     }
   }
@@ -577,7 +577,7 @@ export class MainScene extends Phaser.Scene {
     if (typeof data.playerName === 'string' && data.playerName.trim().length > 0) {
       this.playerName = data.playerName.trim();
       this.registry.set('playerName', this.playerName);
-      this.playerNameText?.setText(`Jogador: ${this.playerName}`);
+      this.playerNameText?.setText(`Nome ${this.playerName}`);
     }
 
     const maxHp = safeNum(data.player.stats.maxHealth, 1, 9999);
