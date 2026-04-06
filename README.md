@@ -15,6 +15,9 @@ Projeto de jogo web com React (Vite) e Phaser.js.
 - Animacoes de `idle` e `walking` para 4 direcoes
 - Mapa top-down com tiles e paredes com colisao
 - Camera centralizada no player
+- Inimigos com patrulha aleatoria e perseguicao por proximidade
+- Sistema de combate com ataque do player e dano por atributos
+- Barra de vida do player e barras de vida dos inimigos
 - Preparado para deploy na Vercel (`vercel.json`)
 - Layout responsivo e leve
 - `.gitignore` configurado
@@ -32,6 +35,12 @@ src/
   game/
     animations/
       playerAnimations.js
+    ai/
+      enemyBehavior.js
+    combat/
+      combatSystem.js
+      healthBars.js
+      stats.js
     maps/
       definitions/
         starterFieldMap.js
@@ -41,6 +50,7 @@ src/
     config.js
     createGame.js
     entities/
+      createEnemy.js
       createPlayer.js
     scenes/
       MainScene.js
@@ -55,6 +65,11 @@ src/
 npm install
 npm run dev
 ```
+
+## Controles
+
+- Movimento: setas ou WASD
+- Ataque: ESPACO
 
 ## Build de producao
 

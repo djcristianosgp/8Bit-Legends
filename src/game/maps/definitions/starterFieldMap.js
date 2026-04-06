@@ -43,5 +43,11 @@ export const createStarterFieldMap = () => {
     ground,
     walls,
     spawn: { tileX: 4, tileY: 4 },
+    enemySpawns: [
+      { tileX: 12, tileY: 14 },
+      { tileX: 27, tileY: 10 },
+      { tileX: 38, tileY: 22 },
+      { tileX: 15, tileY: 24 },
+    ],
   };
 };

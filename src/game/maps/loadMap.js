@@ -43,5 +43,9 @@ export const loadMap = (scene, mapId) => {
       width: worldWidth,
       height: worldHeight,
     },
+    enemySpawnPoints: (mapData.enemySpawns ?? []).map((spawn) => ({
+      x: (spawn.tileX + 0.5) * TILE_SIZE,
+      y: (spawn.tileY + 0.5) * TILE_SIZE,
+    })),
   };
 };

@@ -3,8 +3,14 @@ import { createPlayer } from '../entities/createPlayer';
 import { createPlayerAnimations, PLAYER_ANIMS } from '../animations/playerAnimations';
 import { DEFAULT_MAP_ID } from '../maps/mapRegistry';
 import { loadMap } from '../maps/loadMap';
+import { createEnemy } from '../entities/createEnemy';
+import { updateEnemyBehavior } from '../ai/enemyBehavior';
+import { attachEnemyHealthBar, createPlayerHealthBar } from '../combat/healthBars';
+import { performPlayerAttack, processContactDamage } from '../combat/combatSystem';
+import { isDead } from '../combat/stats';
 
 const PLAYER_SPEED = 180;
+const PLAYER_ATTACK_COOLDOWN = 280;
 
 export class MainScene extends Phaser.Scene {
   constructor() {
@@ -14,6 +20,10 @@ export class MainScene extends Phaser.Scene {
     this.wasd = null;
     this.facing = 'down';
     this.worldSize = { width: 0, height: 0 };
+    this.enemies = null;
+    this.attackKey = null;
+    this.playerHealthBar = null;
+    this.lastPlayerAttackAt = -10000;
   }
 
   preload() {
@@ -33,6 +43,18 @@ export class MainScene extends Phaser.Scene {
     this.player = createPlayer(this, mapState.spawnPoint.x, mapState.spawnPoint.y);
     this.player.anims.play(PLAYER_ANIMS.idleDown, true);
     this.physics.add.collider(this.player, mapState.wallLayer);
+    this.playerHealthBar = createPlayerHealthBar(this, this.player.stats);
+
+    this.enemies = this.physics.add.group();
+    mapState.enemySpawnPoints.forEach((spawn) => {
+      const enemy = createEnemy(this, spawn.x, spawn.y);
+      attachEnemyHealthBar(this, enemy);
+      this.enemies.add(enemy);
+    });
+
+    this.physics.add.collider(this.enemies, mapState.wallLayer);
+    this.physics.add.collider(this.enemies, this.enemies);
+    this.physics.add.overlap(this.player, this.enemies, this.onPlayerEnemyOverlap, null, this);
 
     const camera = this.cameras.main;
     camera.setBounds(0, 0, this.worldSize.width, this.worldSize.height);
@@ -46,14 +68,17 @@ export class MainScene extends Phaser.Scene {
       left: Phaser.Input.Keyboard.KeyCodes.A,
       right: Phaser.Input.Keyboard.KeyCodes.D,
     });
+    this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     this.scale.on('resize', this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off('resize', this.handleResize, this);
+      this.playerHealthBar?.destroy();
+      this.enemies?.children.iterate((enemy) => enemy?.healthBar?.destroy());
     });
   }
 
-  update() {
+  update(time) {
     if (!this.player) {
       return;
     }
@@ -89,6 +114,60 @@ export class MainScene extends Phaser.Scene {
     this.player.body.setVelocity(velocity.x, velocity.y);
 
     this.updateAnimation(velocity.lengthSq() > 0);
+    this.updateEnemies(time);
+    this.tryPlayerAttack(time);
+  }
+
+  updateEnemies(time) {
+    if (!this.enemies) {
+      return;
+    }
+
+    this.enemies.children.iterate((enemy) => {
+      if (!enemy || !enemy.active) {
+        return;
+      }
+
+      updateEnemyBehavior(enemy, this.player, time);
+      enemy.healthBar?.update();
+    });
+  }
+
+  tryPlayerAttack(time) {
+    if (!Phaser.Input.Keyboard.JustDown(this.attackKey)) {
+      return;
+    }
+
+    if (time - this.lastPlayerAttackAt < PLAYER_ATTACK_COOLDOWN) {
+      return;
+    }
+
+    this.lastPlayerAttackAt = time;
+    performPlayerAttack({
+      scene: this,
+      player: this.player,
+      enemies: this.enemies,
+      facing: this.facing,
+      now: time,
+    });
+  }
+
+  onPlayerEnemyOverlap(player, enemy) {
+    const didTakeDamage = processContactDamage({
+      player,
+      enemy,
+      now: this.time.now,
+      cooldownMs: 850,
+    });
+
+    if (didTakeDamage) {
+      this.playerHealthBar?.update();
+    }
+
+    if (isDead(player.stats)) {
+      player.body.setVelocity(0, 0);
+      this.scene.restart();
+    }
   }
 
   updateAnimation(isMoving) {

@@ -20,7 +20,7 @@ function App() {
     <main className="app-shell">
       <header className="game-header">
         <h1>8Bit Legends</h1>
-        <p>Mova o heroi com as setas ou WASD.</p>
+        <p>Mova com setas/WASD e ataque com ESPACO.</p>
       </header>
       <section className="game-wrapper">
         <div ref={containerRef} className="game-container" />
