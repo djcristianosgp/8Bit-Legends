@@ -96,7 +96,7 @@ export class OverlayScene extends Phaser.Scene {
 
     // ── Dica de controle ──────────────────────────────────────────────────────
     this.add
-      .text(width / 2, height / 2 + 52, 'Clique no botão ou aguarde a contagem.', {
+      .text(width / 2, height / 2 + 52, 'Loot da fase coletado. Clique ou aguarde a contagem.', {
         fontFamily: 'Trebuchet MS, sans-serif',
         fontSize: '13px',
         color: '#7a7090',
@@ -215,6 +215,7 @@ export class OverlayScene extends Phaser.Scene {
     }
 
     const mainScene = this.scene.get('MainScene');
+    mainScene?.audioSystem?.playUiConfirm();
     mainScene?.scene?.stop();
     this.scene.stop(OVERLAY_SCENE_KEY);
 

@@ -69,6 +69,10 @@ export const performPlayerAttack = ({
     hitCount += 1;
   });
 
+  if (hitCount > 0) {
+    scene.audioSystem?.playHit();
+  }
+
   const flash = scene.add.circle(player.x, player.y, ATTACK_RANGE, 0xffd166, 0.2);
   flash.setDepth(8);
   scene.visualEffects?.spawnImpact(player.x, player.y, 0xffd166, ATTACK_RANGE / 1.7);

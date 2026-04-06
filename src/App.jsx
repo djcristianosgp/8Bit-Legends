@@ -20,6 +20,10 @@ function App() {
     hp: 100,
     maxHp: 100,
     status: 'Aguardando inicio',
+    paused: false,
+    enemyCount: 0,
+    enemyTotal: 0,
+    weatherLabel: 'Dia',
     weaponLabel: 'Common Sword [melee]',
     skills: { fireball: 'OK', lightning: 'OK', aura: 'OK', auraActive: 'OFF' },
     inventory: { health: 0, strength: 0, speed: 0 },
@@ -105,6 +109,10 @@ function App() {
     setStarted(true);
   };
 
+  const handlePauseToggle = () => {
+    gameRef.current?.events.emit('toggle-pause');
+  };
+
   const hpPercent = Math.round((hud.hp / Math.max(1, hud.maxHp)) * 100);
 
   const handleSave = () => {
@@ -141,7 +149,7 @@ function App() {
     <main className="app-shell">
       <header className="game-header">
         <h1>8Bit Legends</h1>
-        <p>Mova com setas/WASD &middot; Ataque: ESPACO (ou botao no mobile)</p>
+        <p>Mova com setas/WASD &middot; Ataque: ESPACO &middot; Skills: 1/2/3 &middot; Pausa: ESC</p>
       </header>
 
       {!started && (
@@ -172,7 +180,11 @@ function App() {
           <div className="hud-main">
             <strong className="hud-name">{hud.playerName}</strong>
             <span className="hud-chip">Fase {hud.phase}</span>
-            <span className="hud-chip">Status: {hud.status}</span>
+            <span className={`hud-chip ${hud.enemyCount <= 3 && hud.enemyTotal > 0 ? 'hud-chip--warn' : ''}`}>
+              👾 {hud.enemyCount}/{hud.enemyTotal || hud.enemyCount}
+            </span>
+            <span className="hud-chip">Clima: {hud.weatherLabel}</span>
+            <span className={`hud-chip ${hud.paused ? 'hud-chip--pause' : ''}`}>Status: {hud.status}</span>
             <span className="hud-chip">⚔ {hud.weaponLabel}</span>
           </div>
           <div className="hud-life" aria-label="Vida do jogador">
@@ -192,6 +204,11 @@ function App() {
               3 Aura {hud.skills.aura}
             </span>
             <span className="hud-skill">Aura ativa: {hud.skills.auraActive}</span>
+          </div>
+          <div className="hud-actions">
+            <button className="save-btn hud-action-btn" type="button" onClick={handlePauseToggle}>
+              {hud.paused ? '▶ Continuar' : '⏸ Pausar'}
+            </button>
           </div>
         </section>
       )}

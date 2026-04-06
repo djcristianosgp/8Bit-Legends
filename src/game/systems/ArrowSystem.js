@@ -191,6 +191,7 @@ export class ArrowSystem {
 
     const damage = arrow.getData('damage') || this.baseDamage;
     applyDamage(enemy.stats, damage);
+    this.scene.audioSystem?.playHit();
 
     enemy.lastReceivedHitAt = Date.now();
     if (enemy.healthBar) {

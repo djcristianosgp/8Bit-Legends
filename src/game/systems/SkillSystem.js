@@ -112,6 +112,7 @@ export class SkillSystem {
     const config = SKILL_CONFIG.fireball;
 
     if (this.isOnCooldown(config.key, time) || !this.projectiles) {
+      this.scene.audioSystem?.playError();
       return false;
     }
 
@@ -141,6 +142,7 @@ export class SkillSystem {
     });
 
     this.startCooldown(config.key, time);
+    this.scene.audioSystem?.playSkillCast('fireball');
     return true;
   }
 
@@ -148,11 +150,13 @@ export class SkillSystem {
     const config = SKILL_CONFIG.lightning;
 
     if (this.isOnCooldown(config.key, time)) {
+      this.scene.audioSystem?.playError();
       return false;
     }
 
     const target = this.findNearestEnemy(this.player, config.range);
     if (!target) {
+      this.scene.audioSystem?.playError();
       return false;
     }
 
@@ -181,6 +185,7 @@ export class SkillSystem {
     });
 
     this.startCooldown(config.key, time);
+    this.scene.audioSystem?.playSkillCast('lightning');
 
     if (isDead(target.stats)) {
       this.onEnemyDefeated(target);
@@ -195,6 +200,7 @@ export class SkillSystem {
     const config = SKILL_CONFIG.aura;
 
     if (this.isOnCooldown(config.key, time) || !this.player?.stats) {
+      this.scene.audioSystem?.playError();
       return false;
     }
 
@@ -229,6 +235,7 @@ export class SkillSystem {
     );
 
     this.startCooldown(config.key, time);
+    this.scene.audioSystem?.playSkillCast('aura');
     return true;
   }
 

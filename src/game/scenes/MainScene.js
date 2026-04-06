@@ -16,6 +16,10 @@ import { WeaponSystem } from '../systems/WeaponSystem';
 import { LootSystem } from '../systems/LootSystem';
 import { AmbienceSystem } from '../systems/AmbienceSystem';
 import { VisualEffectsSystem } from '../systems/VisualEffectsSystem';
+import { PauseSystem } from '../systems/PauseSystem';
+import { WeatherSystem } from '../systems/WeatherSystem';
+import { AUDIO_ASSETS, AudioSystem } from '../systems/AudioSystem';
+import { MinimapSystem } from '../systems/MinimapSystem';
 import { createInventory, addItemToInventory } from '../items/inventory';
 import { ITEM_CONFIG } from '../items/itemDefinitions';
 import { applyItemEffect } from '../items/itemEffects';
@@ -68,6 +72,9 @@ export class MainScene extends Phaser.Scene {
 
     this.lastEnemyUpdateAt = 0;
     this.lastStatePublishAt = 0;
+    this.initialEnemyCount = 0;
+    this.spawnPoint = { x: 0, y: 0 };
+    this.isGameplayPaused = false;
 
     // Systems
     this.arrowSystem = null;
@@ -77,6 +84,10 @@ export class MainScene extends Phaser.Scene {
     this.lootSystem = null;
     this.ambienceSystem = null;
     this.visualEffects = null;
+    this.pauseSystem = null;
+    this.weatherSystem = null;
+    this.audioSystem = null;
+    this.minimapSystem = null;
   }
 
   /**
@@ -122,6 +133,12 @@ export class MainScene extends Phaser.Scene {
 
     this.load.image('arrow', '/assets/sprites/arrow.png');
     this.load.image('shield', '/assets/sprites/shield.png');
+
+    Object.entries(AUDIO_ASSETS).forEach(([key, path]) => {
+      if (!this.cache.audio?.exists(key)) {
+        this.load.audio(key, path);
+      }
+    });
   }
 
   create() {
@@ -133,6 +150,7 @@ export class MainScene extends Phaser.Scene {
 
     const mapState = loadMap(this, this.currentMapId, this.startPhase);
     this.worldSize = mapState.worldSize;
+    this.spawnPoint = { ...mapState.spawnPoint };
 
     createPlayerAnimations(this);
     this.player = createPlayer(this, mapState.spawnPoint.x, mapState.spawnPoint.y);
@@ -142,6 +160,15 @@ export class MainScene extends Phaser.Scene {
 
     this.visualEffects = new VisualEffectsSystem(this);
     this.visualEffects.create(this.player);
+
+    this.weatherSystem = new WeatherSystem(this);
+    this.weatherSystem.create({ phase: this.startPhase });
+
+    this.audioSystem = new AudioSystem(this);
+    this.audioSystem.create({
+      phase: this.startPhase,
+      weatherType: this.weatherSystem.getWeatherType(),
+    });
 
     this.weaponSystem = new WeaponSystem(this);
     this.weaponSystem.create(this.player);
@@ -156,12 +183,13 @@ export class MainScene extends Phaser.Scene {
     // ── HUD: inventário ────────────────────────────────────────────────────
     this.inventory = createInventory();
     this.inventoryText = this.add
-      .text(14, 96, '', {
+      .text(22, 92, '', {
         fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '12px',
+        fontSize: '11px',
         color: '#f2e7cc',
         stroke: '#171b27',
         strokeThickness: 3,
+        lineSpacing: 2,
       })
       .setScrollFactor(0)
       .setDepth(31);
@@ -182,9 +210,9 @@ export class MainScene extends Phaser.Scene {
     this.updatePhaseHud();
 
     this.playerNameText = this.add
-      .text(14, 60, `Nome ${this.playerName}`, {
+      .text(22, 58, `Nome ${this.playerName}`, {
         fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '12px',
+        fontSize: '11px',
         color: '#a8d7ff',
         stroke: '#171b27',
         strokeThickness: 3,
@@ -193,9 +221,9 @@ export class MainScene extends Phaser.Scene {
       .setDepth(31);
 
     this.statusText = this.add
-      .text(14, 78, 'Status Explorando', {
+      .text(22, 74, 'Status Explorando', {
         fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '12px',
+        fontSize: '11px',
         color: '#bde5b8',
         stroke: '#171b27',
         strokeThickness: 3,
@@ -233,6 +261,8 @@ export class MainScene extends Phaser.Scene {
       this.enemies.add(boss);
     }
 
+    this.initialEnemyCount = this.enemies.countActive(true);
+
     this.physics.add.collider(this.enemies, mapState.wallLayer);
     this.physics.add.collider(this.enemies, this.enemies);
     this.physics.add.overlap(this.player, this.enemies, this.onPlayerEnemyOverlap, null, this);
@@ -258,6 +288,19 @@ export class MainScene extends Phaser.Scene {
       onEnemyDefeated: (enemy) => this.handleEnemyDefeat(enemy),
     });
     this.skillSystem.create(this.player, this.enemies);
+
+    this.minimapSystem = new MinimapSystem(this);
+    this.minimapSystem.create({
+      player: this.player,
+      enemies: this.enemies,
+      worldSize: this.worldSize,
+    });
+
+    this.pauseSystem = new PauseSystem(this, {
+      onRestartPhase: () => this.restartCurrentPhase(),
+      onRestartGame: () => this.restartGame(),
+    });
+    this.pauseSystem.create();
 
     // ── Câmera ─────────────────────────────────────────────────────────────
     const camera = this.cameras.main;
@@ -293,10 +336,18 @@ export class MainScene extends Phaser.Scene {
       this.skillSystem?.destroy();
       this.ambienceSystem?.destroy();
       this.visualEffects?.destroy();
+      this.pauseSystem?.destroy();
+      this.weatherSystem?.destroy();
+      this.audioSystem?.destroy();
+      this.minimapSystem?.destroy();
       this.weaponSystem = null;
       this.lootSystem = null;
       this.ambienceSystem = null;
       this.visualEffects = null;
+      this.pauseSystem = null;
+      this.weatherSystem = null;
+      this.audioSystem = null;
+      this.minimapSystem = null;
     });
 
     // Auto-save a cada 30s (só quando o player está vivo)
@@ -315,7 +366,9 @@ export class MainScene extends Phaser.Scene {
   }
 
   update(time) {
-    if (!this.player || this.phaseClear) {
+    this.pauseSystem?.update(time);
+
+    if (!this.player || this.phaseClear || this.pauseSystem?.isPaused()) {
       return;
     }
 
@@ -368,7 +421,9 @@ export class MainScene extends Phaser.Scene {
     this.shieldSystem?.update(time);
     this.skillSystem?.update(time, this.player, this.enemies, this.facing);
     this.ambienceSystem?.update(time);
+    this.weatherSystem?.update(time);
     this.visualEffects?.update(time, isMoving, this.facing);
+    this.minimapSystem?.update(time);
 
     if (time - this.lastStatePublishAt >= STATE_PUBLISH_INTERVAL_MS) {
       this.lastStatePublishAt = time;
@@ -437,6 +492,21 @@ export class MainScene extends Phaser.Scene {
     this.time.delayedCall(50, () => this.checkPhaseClear());
   }
 
+  collectRemainingDrops() {
+    if (!this.itemDrops?.children || !this.player) {
+      return;
+    }
+
+    const pendingDrops = [];
+    this.itemDrops.children.iterate((drop) => {
+      if (drop?.active) {
+        pendingDrops.push(drop);
+      }
+    });
+
+    pendingDrops.forEach((drop) => this.onPlayerCollectDrop(this.player, drop));
+  }
+
   onPlayerCollectDrop(player, drop) {
     const dropData =
       drop?.dropData ??
@@ -455,6 +525,7 @@ export class MainScene extends Phaser.Scene {
     }
 
     if (dropData.kind === 'weapon' && dropData.weaponId) {
+      this.audioSystem?.playLootPickup();
       this.weaponSystem?.equipWeapon(dropData.weaponId, dropData.rarity);
       this.updateInventoryHud();
       this.publishSharedState(this.getCurrentStatusLabel());
@@ -475,6 +546,7 @@ export class MainScene extends Phaser.Scene {
       rarity: dropData.rarity,
     });
 
+    this.audioSystem?.playLootPickup();
     addItemToInventory(this.inventory, itemType);
     this.playerHealthBar?.update();
     this.updateInventoryHud();
@@ -499,6 +571,8 @@ export class MainScene extends Phaser.Scene {
     if (!this.enemies || this.enemies.countActive(true) > 0) return;
 
     this.phaseClear = true;
+    this.collectRemainingDrops();
+    this.audioSystem?.playPhaseClear();
     this.publishSharedState('Transicao');
 
     if (this.player?.body) {
@@ -550,23 +624,29 @@ export class MainScene extends Phaser.Scene {
 
     const attackTotal = getAttackValue(this.player.stats);
     const speedTotal = getMoveSpeed(this.player.stats, PLAYER_SPEED);
-    const weaponLabel = this.weaponSystem?.getWeaponLabel() ?? 'Common Sword [melee]';
-    const skillLines = this.skillSystem?.getHudLines(this.time.now) ?? [
-      'Skills 1:--  2:--  3:--',
-      'Aura inativa',
-    ];
+    const weaponName = this.weaponSystem?.equipped?.displayName ?? 'Common Sword';
+    const activeEnemies = this.enemies?.countActive(true) ?? 0;
+    const skillSnapshot = this.skillSystem?.getStatusSnapshot(this.time.now) ?? {
+      fireball: '--',
+      lightning: '--',
+      aura: '--',
+      auraActive: 'OFF',
+    };
 
     this.inventoryText.setText(
       [
-        `Itens  Vida:${this.inventory.health}  Forca:${this.inventory.strength}  Vel:${this.inventory.speed}`,
-        `Arma  ${weaponLabel}`,
-        `Atributos  ATQ:${attackTotal}  DEF:${this.player.stats.defense}  MOV:${Math.round(speedTotal)}`,
-        ...skillLines,
+        `Loot HP:${this.inventory.health} ATQ:${this.inventory.strength} VEL:${this.inventory.speed}`,
+        `Arma ${weaponName}`,
+        `ATQ:${attackTotal} DEF:${this.player.stats.defense} MOV:${Math.round(speedTotal)}`,
+        `Inim ${activeEnemies}/${this.initialEnemyCount}  Clima ${this.weatherSystem?.getLabel() ?? 'Dia'}`,
+        `1:${skillSnapshot.fireball}  2:${skillSnapshot.lightning}  3:${skillSnapshot.aura}`,
+        `Aura ${skillSnapshot.auraActive}`,
       ].join('\n'),
     );
   }
 
   getCurrentStatusLabel() {
+    if (this.pauseSystem?.isPaused()) return 'Pausado';
     if (this.phaseClear) return 'Transicao';
 
     if (this.enemies) {
@@ -602,12 +682,17 @@ export class MainScene extends Phaser.Scene {
       auraActive: 'OFF',
     };
 
+    const activeEnemies = this.enemies?.countActive(true) ?? 0;
     const snapshot = {
       playerName: this.playerName,
       phase: this.startPhase,
       hp: this.player.stats.health,
       maxHp: this.player.stats.maxHealth,
       status: statusLabel,
+      paused: this.pauseSystem?.isPaused() ?? false,
+      enemyCount: activeEnemies,
+      enemyTotal: this.initialEnemyCount,
+      weatherLabel: this.weatherSystem?.getLabel() ?? 'Dia',
       weaponLabel: this.weaponSystem?.getWeaponLabel() ?? 'Common Sword [melee]',
       skills: skillSnapshot,
       inventory: {
@@ -619,6 +704,7 @@ export class MainScene extends Phaser.Scene {
 
     this.stateStore?.patch(snapshot);
     this.socketSync?.publishLocalState(snapshot);
+    this.audioSystem?.update({ statusLabel });
 
     if (this.statusText) {
       this.statusText.setText(`Status ${statusLabel}`);
@@ -679,6 +765,46 @@ export class MainScene extends Phaser.Scene {
         this.scene.pause();
         this.scene.launch(OVERLAY_SCENE_KEY, { type: 'defeat', phase: this.startPhase });
       });
+    }
+  }
+
+  restartCurrentPhase() {
+    try {
+      const saveData = serializeScene(this);
+      saveData.phase = this.startPhase;
+      saveData.restoreFullHealth = true;
+
+      if (saveData.player?.stats) {
+        saveData.player.stats.health = saveData.player.stats.maxHealth;
+      }
+
+      if (saveData.player) {
+        saveData.player.x = this.spawnPoint.x;
+        saveData.player.y = this.spawnPoint.y;
+      }
+
+      writeToStorage(saveData);
+    } catch {
+      // Falha silenciosa; ainda tentaremos reiniciar a cena
+    }
+
+    this.scene.restart({ phase: this.startPhase });
+  }
+
+  restartGame() {
+    try {
+      localStorage.removeItem('8bitlegends_save');
+      localStorage.removeItem('8bl_autostart');
+      localStorage.removeItem('8bl_player_name');
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('8bl_restore_full_hp');
+      }
+    } catch {
+      // noop
+    }
+
+    if (typeof window !== 'undefined' && window.location) {
+      window.location.reload();
     }
   }
 
@@ -749,8 +875,10 @@ export class MainScene extends Phaser.Scene {
     this.player.stats.bonusAttack = safeNum(data.player.stats.bonusAttack, 0, 999);
     this.player.stats.bonusSpeed = safeNum(data.player.stats.bonusSpeed, 0, 999);
 
-    this.player.x = safeNum(data.player.x, 0, this.worldSize.width);
-    this.player.y = safeNum(data.player.y, 0, this.worldSize.height);
+    if (data.mapId === this.currentMapId) {
+      this.player.x = safeNum(data.player.x, 0, this.worldSize.width);
+      this.player.y = safeNum(data.player.y, 0, this.worldSize.height);
+    }
     this.facing = VALID_FACINGS.includes(data.player.facing) ? data.player.facing : 'down';
 
     this.inventory.health = safeNum(data.inventory.health, 0, 9999);

@@ -4,6 +4,10 @@ const cloneHudState = (state) => ({
   hp: state.hp,
   maxHp: state.maxHp,
   status: state.status,
+  paused: state.paused,
+  enemyCount: state.enemyCount,
+  enemyTotal: state.enemyTotal,
+  weatherLabel: state.weatherLabel,
   weaponLabel: state.weaponLabel,
   skills: {
     fireball: state.skills.fireball,
@@ -29,6 +33,10 @@ export const createGameStateStore = (initialState) => {
     hp: initialState?.hp ?? 100,
     maxHp: initialState?.maxHp ?? 100,
     status: initialState?.status ?? 'Explorando',
+    paused: initialState?.paused ?? false,
+    enemyCount: initialState?.enemyCount ?? 0,
+    enemyTotal: initialState?.enemyTotal ?? 0,
+    weatherLabel: initialState?.weatherLabel ?? 'Dia',
     weaponLabel: initialState?.weaponLabel ?? 'Common Sword [melee]',
     skills: {
       fireball: initialState?.skills?.fireball ?? 'OK',

@@ -158,6 +158,16 @@ body {
   background: rgb(21 35 59 / 70%);
 }
 
+.hud-chip--warn {
+  border-color: rgb(255 158 106 / 75%);
+  color: #ffd0ad;
+}
+
+.hud-chip--pause {
+  border-color: rgb(199 174 103 / 75%);
+  color: #ffe6a8;
+}
+
 .hud-life {
   display: grid;
   gap: 0.35rem;
@@ -204,6 +214,15 @@ body {
 .hud-skill--cooldown {
   border-color: rgb(191 143 85 / 70%);
   color: #f3d39a;
+}
+
+.hud-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hud-action-btn {
+  min-width: 118px;
 }
 
 .game-container {
