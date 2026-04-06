@@ -1,0 +1,29 @@
+{
+  "name": "8bit-legends",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "phaser",
+    "react",
+    "vite",
+    "game"
+  ],
+  "author": "",
+  "license": "MIT",
+  "description": "8Bit Legends - jogo web com React + Phaser",
+  "dependencies": {
+    "phaser": "^3.90.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.5"
+  }
+}
