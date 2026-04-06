@@ -26,6 +26,7 @@ export class WeatherSystem {
     this.overlay = null;
     this.rainGraphics = null;
     this.raindrops = [];
+    this.reducedEffects = Boolean(scene.registry.get('deviceProfile')?.reducedEffects);
     this._handleResize = (gameSize) => this.layout(gameSize.width, gameSize.height);
   }
 
@@ -46,7 +47,8 @@ export class WeatherSystem {
   }
 
   createRaindrops() {
-    this.raindrops = Array.from({ length: 68 }, () => ({
+    const dropCount = this.reducedEffects ? 32 : 68;
+    this.raindrops = Array.from({ length: dropCount }, () => ({
       x: Phaser.Math.Between(0, this.scene.scale.width),
       y: Phaser.Math.Between(0, this.scene.scale.height),
       speed: Phaser.Math.Between(240, 420),
@@ -86,7 +88,7 @@ export class WeatherSystem {
     const height = this.scene.scale.height;
 
     this.rainGraphics.clear();
-    this.rainGraphics.lineStyle(1, 0x9fdcff, 0.35);
+    this.rainGraphics.lineStyle(1, 0x9fdcff, this.reducedEffects ? 0.22 : 0.35);
 
     this.raindrops.forEach((drop) => {
       drop.y += drop.speed * 0.016;

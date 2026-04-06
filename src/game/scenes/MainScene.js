@@ -67,8 +67,18 @@ export class MainScene extends Phaser.Scene {
       left: false,
       right: false,
       attack: false,
+      skill1: false,
+      skill2: false,
+      skill3: false,
+      shield: false,
     };
     this.mobileAttackQueued = false;
+    this.mobileSkillQueued = {
+      fireball: false,
+      lightning: false,
+      aura: false,
+    };
+    this.mobileShieldQueued = false;
 
     this.lastEnemyUpdateAt = 0;
     this.lastStatePublishAt = 0;
@@ -98,6 +108,12 @@ export class MainScene extends Phaser.Scene {
     this.playerName = (this.registry.get('playerName') ?? 'Heroi').trim() || 'Heroi';
     this.stateStore = this.registry.get('stateStore') ?? null;
     this.socketSync = this.registry.get('socketSync') ?? null;
+    this.deviceProfile = this.registry.get('deviceProfile') ?? {
+      isMobile: false,
+      reducedEffects: false,
+      preferredZoom: 1.08,
+      targetFps: 60,
+    };
 
     if (data?.phase != null) {
       this.startPhase = Math.max(1, Math.min(TOTAL_PHASES, Number(data.phase) || 1));
@@ -304,8 +320,9 @@ export class MainScene extends Phaser.Scene {
 
     // ── Câmera ─────────────────────────────────────────────────────────────
     const camera = this.cameras.main;
+    this.physics.world.setFPS(this.deviceProfile?.targetFps ?? 60);
     camera.setBounds(0, 0, this.worldSize.width, this.worldSize.height);
-    camera.setZoom(1.08);
+    this.updateResponsiveCamera(this.scale.width, this.scale.height);
     camera.startFollow(this.player, true, 0.12, 0.12);
     camera.roundPixels = true;
 
@@ -409,12 +426,14 @@ export class MainScene extends Phaser.Scene {
     const isMoving = moveX !== 0 || moveY !== 0;
     this.updateAnimation(isMoving);
 
-    if (time - this.lastEnemyUpdateAt >= ENEMY_UPDATE_INTERVAL_MS) {
+    const enemyUpdateInterval = this.deviceProfile?.reducedEffects ? 48 : ENEMY_UPDATE_INTERVAL_MS;
+    if (time - this.lastEnemyUpdateAt >= enemyUpdateInterval) {
       this.lastEnemyUpdateAt = time;
       this.updateEnemies(time);
     }
 
     this.tryPlayerAttack(time);
+    this.processQueuedMobileActions(time);
 
     // Update systems
     this.arrowSystem?.update(time, this.player, this.enemies);
@@ -480,6 +499,28 @@ export class MainScene extends Phaser.Scene {
         this.handleEnemyDefeat(enemy);
       },
     });
+  }
+
+  processQueuedMobileActions(time) {
+    if (this.mobileShieldQueued) {
+      this.mobileShieldQueued = false;
+      this.shieldSystem?.tryActivateShield(time);
+    }
+
+    if (this.mobileSkillQueued.fireball) {
+      this.mobileSkillQueued.fireball = false;
+      this.skillSystem?.tryCastFireball(time, this.facing);
+    }
+
+    if (this.mobileSkillQueued.lightning) {
+      this.mobileSkillQueued.lightning = false;
+      this.skillSystem?.tryCastLightning(time);
+    }
+
+    if (this.mobileSkillQueued.aura) {
+      this.mobileSkillQueued.aura = false;
+      this.skillSystem?.tryCastAura(time);
+    }
   }
 
   handleEnemyDefeat(enemy) {
@@ -719,10 +760,30 @@ export class MainScene extends Phaser.Scene {
       left: Boolean(payload?.left),
       right: Boolean(payload?.right),
       attack: Boolean(payload?.attack),
+      skill1: Boolean(payload?.skill1),
+      skill2: Boolean(payload?.skill2),
+      skill3: Boolean(payload?.skill3),
+      shield: Boolean(payload?.shield),
     };
 
     if (!this.mobileInput.attack && next.attack) {
       this.mobileAttackQueued = true;
+    }
+
+    if (!this.mobileInput.skill1 && next.skill1) {
+      this.mobileSkillQueued.fireball = true;
+    }
+
+    if (!this.mobileInput.skill2 && next.skill2) {
+      this.mobileSkillQueued.lightning = true;
+    }
+
+    if (!this.mobileInput.skill3 && next.skill3) {
+      this.mobileSkillQueued.aura = true;
+    }
+
+    if (!this.mobileInput.shield && next.shield) {
+      this.mobileShieldQueued = true;
     }
 
     this.mobileInput = next;
@@ -923,5 +984,17 @@ export class MainScene extends Phaser.Scene {
       this.worldSize.height,
     );
     this.cameras.main.setSize(width, height);
+    this.updateResponsiveCamera(width, height);
+  }
+
+  updateResponsiveCamera(width = this.scale.width, height = this.scale.height) {
+    if (!this.cameras?.main) {
+      return;
+    }
+
+    const compactSize = Math.min(width, height);
+    const baseZoom = this.deviceProfile?.preferredZoom ?? 1.08;
+    const zoom = compactSize < 460 ? 0.82 : compactSize < 720 ? 0.92 : baseZoom;
+    this.cameras.main.setZoom(Phaser.Math.Clamp(zoom, 0.78, 1.15));
   }
 }

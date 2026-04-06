@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { createGameConfig } from './config';
+import { createGameConfig, getDeviceProfile } from './config';
 import { createSaveBridge } from './save/saveBridge';
 import { createGameStateStore } from './state/gameState';
 import { createSocketSync } from './net/socketSync';
@@ -14,6 +14,7 @@ export const createGame = (parentElement, options = {}) => {
   game.registry.set('playerName', playerName);
   game.registry.set('stateStore', stateStore);
   game.registry.set('socketSync', socketSync);
+  game.registry.set('deviceProfile', getDeviceProfile());
 
   const saveBridge = createSaveBridge(game);
   return { game, saveBridge, stateStore, socketSync };

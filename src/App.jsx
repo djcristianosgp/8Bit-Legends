@@ -2,6 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createGame } from './game/createGame';
 import { importFromFile } from './game/save/saveStorage';
 
+const MOBILE_QUERY = '(max-width: 900px), (pointer: coarse)';
+const DEFAULT_MOBILE_INPUT = {
+  up: false,
+  down: false,
+  left: false,
+  right: false,
+  attack: false,
+  skill1: false,
+  skill2: false,
+  skill3: false,
+  shield: false,
+};
+
 function App() {
   const containerRef = useRef(null);
   const gameRef = useRef(null);
@@ -14,6 +27,24 @@ function App() {
   const [started, setStarted] = useState(() => localStorage.getItem('8bl_autostart') === '1');
   const [playerName, setPlayerName] = useState(() => localStorage.getItem('8bl_player_name') ?? 'Heroi');
   const [toast, setToast] = useState(null);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showTouchControls, setShowTouchControls] = useState(
+    () => localStorage.getItem('8bl_touch_controls') !== '0',
+  );
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      return false;
+    }
+
+    return window.matchMedia(MOBILE_QUERY).matches;
+  });
+  const [isStandalone, setIsStandalone] = useState(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      return false;
+    }
+
+    return window.matchMedia('(display-mode: standalone)').matches;
+  });
   const [hud, setHud] = useState({
     playerName: 'Heroi',
     phase: 1,
@@ -28,24 +59,86 @@ function App() {
     skills: { fireball: 'OK', lightning: 'OK', aura: 'OK', auraActive: 'OFF' },
     inventory: { health: 0, strength: 0, speed: 0 },
   });
-  const [mobileInput, setMobileInput] = useState({
-    up: false,
-    down: false,
-    left: false,
-    right: false,
-    attack: false,
-  });
+  const [mobileInput, setMobileInput] = useState(DEFAULT_MOBILE_INPUT);
 
   const showToast = useCallback((msg, ok = true) => {
     if (toastTimeoutRef.current) {
       clearTimeout(toastTimeoutRef.current);
     }
+
     setToast({ msg, ok });
     toastTimeoutRef.current = setTimeout(() => {
       setToast(null);
       toastTimeoutRef.current = null;
     }, 2400);
   }, []);
+
+  const pulseHaptics = useCallback((duration = 12) => {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(duration);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      return undefined;
+    }
+
+    const viewportQuery = window.matchMedia(MOBILE_QUERY);
+    const standaloneQuery = window.matchMedia('(display-mode: standalone)');
+    const syncViewportState = () => {
+      setIsMobileViewport(viewportQuery.matches);
+      setIsStandalone(standaloneQuery.matches);
+    };
+
+    syncViewportState();
+    viewportQuery.addEventListener?.('change', syncViewportState);
+    standaloneQuery.addEventListener?.('change', syncViewportState);
+
+    return () => {
+      viewportQuery.removeEventListener?.('change', syncViewportState);
+      standaloneQuery.removeEventListener?.('change', syncViewportState);
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('8bl_touch_controls', showTouchControls ? '1' : '0');
+  }, [showTouchControls]);
+
+  useEffect(() => {
+    const onPwaStatus = (event) => {
+      if (event.detail === 'offline-ready') {
+        showToast('Modo offline pronto para a próxima sessão!', true);
+      }
+
+      if (event.detail === 'update-ready') {
+        showToast('Nova versão detectada. Atualizando...', true);
+      }
+    };
+
+    window.addEventListener('pwa-status', onPwaStatus);
+    return () => window.removeEventListener('pwa-status', onPwaStatus);
+  }, [showToast]);
+
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+
+    const onAppInstalled = () => {
+      setInstallPrompt(null);
+      showToast('8Bit Legends instalado com sucesso!', true);
+    };
+
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onAppInstalled);
+    };
+  }, [showToast]);
 
   useEffect(() => {
     if (!started || !containerRef.current) {
@@ -68,7 +161,6 @@ function App() {
       setHud(snapshot);
     });
 
-    // Base multiplayer: conexão opcional, não bloqueia offline.
     socketSync.connect();
 
     return () => {
@@ -93,6 +185,39 @@ function App() {
   }, [mobileInput, started]);
 
   useEffect(() => {
+    if (!started) {
+      return undefined;
+    }
+
+    const persistAndPause = () => {
+      saveBridgeRef.current?.save();
+      gameRef.current?.events.emit('force-pause');
+      gameRef.current?.loop?.sleep?.();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        persistAndPause();
+        return;
+      }
+
+      gameRef.current?.loop?.wake?.();
+    };
+
+    const handlePageHide = () => {
+      saveBridgeRef.current?.save();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [started]);
+
+  useEffect(() => {
     return () => {
       if (toastTimeoutRef.current) {
         clearTimeout(toastTimeoutRef.current);
@@ -100,9 +225,27 @@ function App() {
     };
   }, []);
 
-  const setMobileControl = (key, pressed) => {
-    setMobileInput((prev) => ({ ...prev, [key]: pressed }));
-  };
+  const setMobileControl = useCallback((key, pressed) => {
+    setMobileInput((prev) => {
+      if (prev[key] === pressed) {
+        return prev;
+      }
+
+      return { ...prev, [key]: pressed };
+    });
+
+    if (pressed && ['attack', 'skill1', 'skill2', 'skill3', 'shield'].includes(key)) {
+      pulseHaptics(14);
+    }
+  }, [pulseHaptics]);
+
+  const getControlBindings = (key) => ({
+    onPointerDown: () => setMobileControl(key, true),
+    onPointerUp: () => setMobileControl(key, false),
+    onPointerLeave: () => setMobileControl(key, false),
+    onPointerCancel: () => setMobileControl(key, false),
+    onContextMenu: (event) => event.preventDefault(),
+  });
 
   const startGame = () => {
     localStorage.setItem('8bl_autostart', '1');
@@ -111,6 +254,22 @@ function App() {
 
   const handlePauseToggle = () => {
     gameRef.current?.events.emit('toggle-pause');
+  };
+
+  const handleInstallApp = async () => {
+    if (!installPrompt) {
+      showToast('Abra pelo navegador do celular para instalar o app.', false);
+      return;
+    }
+
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+
+    if (choice?.outcome === 'accepted') {
+      showToast('Instalação iniciada!', true);
+    }
+
+    setInstallPrompt(null);
   };
 
   const hpPercent = Math.round((hud.hp / Math.max(1, hud.maxHp)) * 100);
@@ -145,11 +304,35 @@ function App() {
     }
   };
 
+  const shouldShowTouchControls = started && isMobileViewport && showTouchControls;
+
   return (
     <main className="app-shell">
       <header className="game-header">
-        <h1>8Bit Legends</h1>
-        <p>Mova com setas/WASD &middot; Ataque: ESPACO &middot; Skills: 1/2/3 &middot; Pausa: ESC</p>
+        <div>
+          <h1>8Bit Legends</h1>
+          <p>
+            {isMobileViewport
+              ? 'Toque para mover, atacar, usar skills e pausar.'
+              : 'Mova com setas/WASD · Ataque: ESPAÇO · Skills: 1/2/3 · Escudo: SHIFT · Pausa: ESC'}
+          </p>
+        </div>
+        <div className="header-actions">
+          {isMobileViewport && started && (
+            <button
+              className="save-btn header-action-btn"
+              type="button"
+              onClick={() => setShowTouchControls((prev) => !prev)}
+            >
+              {showTouchControls ? 'Ocultar touch' : 'Mostrar touch'}
+            </button>
+          )}
+          {installPrompt && !isStandalone && (
+            <button className="save-btn header-action-btn" type="button" onClick={handleInstallApp}>
+              📲 Instalar app
+            </button>
+          )}
+        </div>
       </header>
 
       {!started && (
@@ -186,6 +369,7 @@ function App() {
             <span className="hud-chip">Clima: {hud.weatherLabel}</span>
             <span className={`hud-chip ${hud.paused ? 'hud-chip--pause' : ''}`}>Status: {hud.status}</span>
             <span className="hud-chip">⚔ {hud.weaponLabel}</span>
+            {isStandalone && <span className="hud-chip">App instalado</span>}
           </div>
           <div className="hud-life" aria-label="Vida do jogador">
             <span>Vida {hud.hp}/{hud.maxHp}</span>
@@ -213,60 +397,90 @@ function App() {
         </section>
       )}
 
-      <section className="game-wrapper">
+      <section className={`game-wrapper ${isMobileViewport ? 'game-wrapper--mobile' : ''}`}>
         <div ref={containerRef} className="game-container" />
       </section>
 
-      {started && (
+      {shouldShowTouchControls && (
         <section className="mobile-controls" aria-label="Controles mobile">
-          <div className="mobile-pad">
-            <button
-              type="button"
-              onPointerDown={() => setMobileControl('up', true)}
-              onPointerUp={() => setMobileControl('up', false)}
-              onPointerLeave={() => setMobileControl('up', false)}
-              onPointerCancel={() => setMobileControl('up', false)}
-            >
-              ▲
-            </button>
-            <button
-              type="button"
-              onPointerDown={() => setMobileControl('left', true)}
-              onPointerUp={() => setMobileControl('left', false)}
-              onPointerLeave={() => setMobileControl('left', false)}
-              onPointerCancel={() => setMobileControl('left', false)}
-            >
-              ◀
-            </button>
-            <button
-              type="button"
-              onPointerDown={() => setMobileControl('down', true)}
-              onPointerUp={() => setMobileControl('down', false)}
-              onPointerLeave={() => setMobileControl('down', false)}
-              onPointerCancel={() => setMobileControl('down', false)}
-            >
-              ▼
-            </button>
-            <button
-              type="button"
-              onPointerDown={() => setMobileControl('right', true)}
-              onPointerUp={() => setMobileControl('right', false)}
-              onPointerLeave={() => setMobileControl('right', false)}
-              onPointerCancel={() => setMobileControl('right', false)}
-            >
-              ▶
-            </button>
+          <div className="mobile-controls__left">
+            <span className="mobile-controls__label">Movimento</span>
+            <div className="mobile-pad">
+              <button
+                className={`mobile-pad-btn ${mobileInput.up ? 'is-pressed' : ''}`}
+                type="button"
+                aria-label="Mover para cima"
+                {...getControlBindings('up')}
+              >
+                ▲
+              </button>
+              <button
+                className={`mobile-pad-btn ${mobileInput.left ? 'is-pressed' : ''}`}
+                type="button"
+                aria-label="Mover para a esquerda"
+                {...getControlBindings('left')}
+              >
+                ◀
+              </button>
+              <button
+                className={`mobile-pad-btn ${mobileInput.down ? 'is-pressed' : ''}`}
+                type="button"
+                aria-label="Mover para baixo"
+                {...getControlBindings('down')}
+              >
+                ▼
+              </button>
+              <button
+                className={`mobile-pad-btn ${mobileInput.right ? 'is-pressed' : ''}`}
+                type="button"
+                aria-label="Mover para a direita"
+                {...getControlBindings('right')}
+              >
+                ▶
+              </button>
+            </div>
           </div>
-          <button
-            className="mobile-attack"
-            type="button"
-            onPointerDown={() => setMobileControl('attack', true)}
-            onPointerUp={() => setMobileControl('attack', false)}
-            onPointerLeave={() => setMobileControl('attack', false)}
-            onPointerCancel={() => setMobileControl('attack', false)}
-          >
-            ATAQUE
-          </button>
+
+          <div className="mobile-controls__right">
+            <span className="mobile-controls__label">Ações</span>
+            <div className="mobile-action-grid">
+              <button
+                className={`mobile-action mobile-action--attack ${mobileInput.attack ? 'is-pressed' : ''}`}
+                type="button"
+                {...getControlBindings('attack')}
+              >
+                ATQ
+              </button>
+              <button
+                className={`mobile-action ${mobileInput.skill1 ? 'is-pressed' : ''}`}
+                type="button"
+                {...getControlBindings('skill1')}
+              >
+                1 🔥
+              </button>
+              <button
+                className={`mobile-action ${mobileInput.skill2 ? 'is-pressed' : ''}`}
+                type="button"
+                {...getControlBindings('skill2')}
+              >
+                2 ⚡
+              </button>
+              <button
+                className={`mobile-action ${mobileInput.skill3 ? 'is-pressed' : ''}`}
+                type="button"
+                {...getControlBindings('skill3')}
+              >
+                3 ✨
+              </button>
+              <button
+                className={`mobile-action mobile-action--shield ${mobileInput.shield ? 'is-pressed' : ''}`}
+                type="button"
+                {...getControlBindings('shield')}
+              >
+                🛡 Escudo
+              </button>
+            </div>
+          </div>
         </section>
       )}
 
@@ -285,6 +499,11 @@ function App() {
         <button className="save-btn" type="button" onClick={handleImportClick}>
           Importar JSON
         </button>
+        {installPrompt && !isStandalone && (
+          <button className="save-btn" type="button" onClick={handleInstallApp}>
+            Instalar App
+          </button>
+        )}
         <input
           ref={fileInputRef}
           type="file"

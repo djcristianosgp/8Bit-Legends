@@ -13,6 +13,11 @@ export class PauseSystem {
     this.isMenuPaused = false;
     this._handleResize = (gameSize) => this.layout(gameSize.width, gameSize.height);
     this._onToggleRequest = () => this.togglePause();
+    this._onForcePauseRequest = () => {
+      if (!this.isPaused()) {
+        this.pauseGame();
+      }
+    };
   }
 
   create() {
@@ -103,6 +108,7 @@ export class PauseSystem {
     this.layout(this.scene.scale.width, this.scene.scale.height);
     this.scene.scale.on('resize', this._handleResize);
     this.scene.game.events.on('toggle-pause', this._onToggleRequest, this);
+    this.scene.game.events.on('force-pause', this._onForcePauseRequest, this);
   }
 
   createActionButton(offsetY, text, onClick, fill = 0x243f6a) {
@@ -241,6 +247,7 @@ export class PauseSystem {
   destroy() {
     this.scene.scale.off('resize', this._handleResize);
     this.scene.game.events.off('toggle-pause', this._onToggleRequest, this);
+    this.scene.game.events.off('force-pause', this._onForcePauseRequest, this);
     this.pauseButton?.destroy(true);
     this.overlay?.destroy(true);
     this.pauseButton = null;

@@ -9,6 +9,8 @@ export class VisualEffectsSystem {
     this.vignette = null;
     this.lastDustAt = 0;
     this.lastTrailAt = 0;
+    this.reducedEffects = Boolean(scene.registry.get('deviceProfile')?.reducedEffects);
+    this.dustInterval = this.reducedEffects ? 210 : 130;
     this.onResize = (gameSize) => this.drawScreenEffects(gameSize.width, gameSize.height);
   }
 
@@ -29,7 +31,7 @@ export class VisualEffectsSystem {
       targets: this.player,
       scaleX: { from: 2, to: 2.04 },
       scaleY: { from: 2, to: 1.98 },
-      duration: 760,
+      duration: this.reducedEffects ? 1200 : 760,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
@@ -44,10 +46,10 @@ export class VisualEffectsSystem {
     }
 
     this.vignette.clear();
-    this.vignette.fillStyle(0x07101c, 0.08);
+    this.vignette.fillStyle(0x07101c, this.reducedEffects ? 0.04 : 0.08);
     this.vignette.fillRect(0, 0, width, height);
 
-    this.vignette.fillStyle(0x02050a, 0.18);
+    this.vignette.fillStyle(0x02050a, this.reducedEffects ? 0.1 : 0.18);
     this.vignette.fillRect(0, 0, width, 20);
     this.vignette.fillRect(0, height - 24, width, 24);
     this.vignette.fillRect(0, 0, 18, height);
@@ -64,7 +66,7 @@ export class VisualEffectsSystem {
     this.playerShadow?.setScale(1 + walkPulse, 1 - walkPulse * 0.35);
     this.playerShadow?.setAlpha(isMoving ? 0.18 : 0.23);
 
-    if (isMoving && time - this.lastDustAt >= 130) {
+    if (isMoving && time - this.lastDustAt >= this.dustInterval) {
       this.lastDustAt = time;
       this.spawnDust(facing);
     }

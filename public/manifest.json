@@ -1,0 +1,28 @@
+{
+  "name": "8Bit Legends",
+  "short_name": "8Bit Legends",
+  "description": "RPG 2D pixel art com combate, skills e progresso persistente, pronto para jogar offline e no mobile.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#0b1627",
+  "theme_color": "#102035",
+  "lang": "pt-BR",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "/pwa/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
