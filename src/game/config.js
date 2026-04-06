@@ -4,7 +4,13 @@ import { MainScene } from './scenes/MainScene';
 export const createGameConfig = (parent) => ({
   type: Phaser.AUTO,
   parent,
+  pixelArt: true,
+  antialias: false,
+  roundPixels: true,
   backgroundColor: '#101725',
+  render: {
+    powerPreference: 'high-performance',
+  },
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,

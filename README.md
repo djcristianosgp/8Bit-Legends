@@ -6,10 +6,12 @@ Projeto de jogo web com React (Vite) e Phaser.js.
 
 - Estrutura organizada em `src/game`
 - Cena principal `MainScene`
-- Personagem renderizado no centro da tela
+- Personagem pixel art animado renderizado no centro da tela
 - Movimentacao por teclado com setas e WASD
 - Movimento limitado aos limites da tela
 - Codigo separado em arquivos com responsabilidades claras
+- Sprites organizados em `public/assets/sprites`
+- Animacoes de `idle` e `walking` para 4 direcoes
 - Preparado para deploy na Vercel (`vercel.json`)
 - Layout responsivo e leve
 - `.gitignore` configurado
@@ -17,8 +19,14 @@ Projeto de jogo web com React (Vite) e Phaser.js.
 ## Estrutura
 
 ```txt
+public/
+  assets/
+    sprites/
+      player_sheet.png
 src/
   game/
+    animations/
+      playerAnimations.js
     config.js
     createGame.js
     entities/
