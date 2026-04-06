@@ -5,6 +5,7 @@ export const serializeScene = (scene) => ({
   timestamp: Date.now(),
   phase: scene.startPhase ?? 1,
   mapId: scene.currentMapId ?? 'phase-1',
+  playerName: scene.playerName ?? 'Heroi',
   player: {
     x: Math.round(scene.player.x),
     y: Math.round(scene.player.y),

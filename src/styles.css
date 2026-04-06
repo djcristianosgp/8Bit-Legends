@@ -2,6 +2,12 @@
   color-scheme: light;
   font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
   background: radial-gradient(circle at 20% 20%, #1c2a4a, #0f1424 58%);
+  --panel-bg: rgb(8 12 24 / 72%);
+  --panel-border: #2f4e85;
+  --accent: #f4c25b;
+  --text-main: #f8f3e6;
+  --ok: #6de38f;
+  --err: #ff8b8b;
 }
 
 * {
@@ -23,7 +29,7 @@ body {
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 1rem;
-  padding: 1rem;
+  padding: clamp(0.65rem, 1.2vw, 1.1rem);
 }
 
 .game-header {
@@ -47,9 +53,116 @@ body {
   align-items: center;
 }
 
+.start-screen {
+  display: flex;
+  justify-content: center;
+}
+
+.start-card {
+  width: min(520px, 94vw);
+  background: var(--panel-bg);
+  border: 2px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 30%);
+}
+
+.start-card h2 {
+  margin: 0;
+  color: var(--accent);
+}
+
+.start-card p {
+  margin: 0.45rem 0 0.9rem;
+  color: #d6dff8;
+}
+
+.start-card label {
+  font-size: 0.88rem;
+  color: #d6dff8;
+}
+
+.start-card input {
+  width: 100%;
+  margin-top: 0.35rem;
+  margin-bottom: 0.8rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 8px;
+  border: 2px solid #375a96;
+  background: #10182c;
+  color: var(--text-main);
+  font-size: 0.95rem;
+}
+
+.start-card input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.start-btn {
+  width: 100%;
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  padding: 0.7rem;
+  border-radius: 8px;
+  border: 2px solid var(--accent);
+  color: var(--text-main);
+  background: #1c2a4a;
+  cursor: pointer;
+}
+
+.start-btn:hover {
+  background: #2a3f6f;
+}
+
+.hud-panel {
+  width: min(900px, 96vw);
+  margin: 0 auto;
+  border: 2px solid var(--panel-border);
+  background: var(--panel-bg);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.hud-main {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  font-size: 0.86rem;
+  color: #d7def5;
+}
+
+.hud-main strong {
+  color: #9ed3ff;
+}
+
+.hud-life {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.hud-life-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #2a2238;
+  border: 1px solid #54466e;
+  overflow: hidden;
+}
+
+.hud-life-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #44b86f, #6de38f);
+  transition: width 0.12s linear;
+}
+
 .game-container {
   width: min(900px, 96vw);
-  height: min(540px, 64vh);
+  height: min(540px, 58vh);
   border: 4px solid #f4c25b;
   border-radius: 10px;
   overflow: hidden;
@@ -65,7 +178,7 @@ canvas {
   justify-content: center;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.4rem 1rem 0.75rem;
+  padding: 0.3rem 0.6rem 0.5rem;
   flex-wrap: wrap;
 }
 
@@ -100,23 +213,105 @@ canvas {
 
 .save-toast--ok {
   background: #1e4730;
-  color: #6de38f;
+  color: var(--ok);
   border: 1px solid #3a9461;
 }
 
 .save-toast--err {
   background: #4a1e1e;
-  color: #ff8b8b;
+  color: var(--err);
   border: 1px solid #a04040;
+}
+
+.mobile-controls {
+  width: min(900px, 96vw);
+  margin: 0 auto;
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.mobile-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 50px);
+  grid-template-rows: repeat(3, 42px);
+  gap: 5px;
+}
+
+.mobile-pad button,
+.mobile-attack {
+  border: 1px solid #4068ad;
+  border-radius: 8px;
+  background: #13233f;
+  color: var(--text-main);
+  touch-action: none;
+}
+
+.mobile-pad button:nth-child(1) {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.mobile-pad button:nth-child(2) {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.mobile-pad button:nth-child(3) {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.mobile-pad button:nth-child(4) {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.mobile-attack {
+  min-width: 110px;
+  min-height: 72px;
+  padding: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
 }
 
 @media (max-width: 700px) {
   .app-shell {
-    padding: 0.75rem;
+    grid-template-rows: auto auto auto 1fr auto auto;
+    gap: 0.55rem;
+    padding: 0.55rem;
   }
 
   .game-container {
     width: 96vw;
-    height: 58vh;
+    height: 47vh;
+    border-width: 3px;
+  }
+
+  .game-header h1 {
+    font-size: 1.45rem;
+  }
+
+  .game-header p {
+    font-size: 0.82rem;
+  }
+
+  .mobile-controls {
+    display: flex;
+  }
+
+  .save-controls {
+    justify-content: stretch;
+  }
+
+  .save-btn {
+    flex: 1 1 30%;
+    min-width: 112px;
+  }
+
+  .save-toast {
+    width: 100%;
+    text-align: center;
   }
 }

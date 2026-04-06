@@ -20,6 +20,8 @@ import { writeToStorage } from '../save/saveStorage';
 
 const PLAYER_SPEED = 180;
 const PLAYER_ATTACK_COOLDOWN = 280;
+const ENEMY_UPDATE_INTERVAL_MS = 33;
+const STATE_PUBLISH_INTERVAL_MS = 120;
 
 export class MainScene extends Phaser.Scene {
   constructor() {
@@ -42,6 +44,23 @@ export class MainScene extends Phaser.Scene {
     /** true enquanto o overlay de vitória/derrota está ativo */
     this.phaseClear = false;
     this.phaseText = null;
+    this.playerName = 'Heroi';
+    this.playerNameText = null;
+    this.statusText = null;
+    this.stateStore = null;
+    this.socketSync = null;
+
+    this.mobileInput = {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      attack: false,
+    };
+    this.mobileAttackQueued = false;
+
+    this.lastEnemyUpdateAt = 0;
+    this.lastStatePublishAt = 0;
   }
 
   /**
@@ -66,6 +85,10 @@ export class MainScene extends Phaser.Scene {
     } catch {
       this.startPhase = 1;
     }
+
+    this.playerName = (this.registry.get('playerName') ?? 'Heroi').trim() || 'Heroi';
+    this.stateStore = this.registry.get('stateStore') ?? null;
+    this.socketSync = this.registry.get('socketSync') ?? null;
   }
 
   preload() {
@@ -121,6 +144,28 @@ export class MainScene extends Phaser.Scene {
       .setOrigin(1, 0);
     this.updatePhaseHud();
 
+    this.playerNameText = this.add
+      .text(14, 58, `Jogador: ${this.playerName}`, {
+        fontFamily: 'Trebuchet MS, sans-serif',
+        fontSize: '13px',
+        color: '#9ed3ff',
+        stroke: '#1b1f2d',
+        strokeThickness: 3,
+      })
+      .setScrollFactor(0)
+      .setDepth(31);
+
+    this.statusText = this.add
+      .text(14, 76, 'Status: Explorando', {
+        fontFamily: 'Trebuchet MS, sans-serif',
+        fontSize: '13px',
+        color: '#bde5b8',
+        stroke: '#1b1f2d',
+        strokeThickness: 3,
+      })
+      .setScrollFactor(0)
+      .setDepth(31);
+
     // ── Drops ──────────────────────────────────────────────────────────────
     this.itemDrops = createDropGroup(this);
     this.physics.add.overlap(this.player, this.itemDrops, this.onPlayerCollectDrop, null, this);
@@ -166,6 +211,7 @@ export class MainScene extends Phaser.Scene {
       right: Phaser.Input.Keyboard.KeyCodes.D,
     });
     this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.game.events.on('mobile-input', this.onMobileInput, this);
 
     // ── Ciclo de vida ──────────────────────────────────────────────────────
     this.scale.on('resize', this.handleResize, this);
@@ -175,6 +221,9 @@ export class MainScene extends Phaser.Scene {
       this.enemies?.children.iterate((e) => e?.healthBar?.destroy());
       this.inventoryText?.destroy();
       this.phaseText?.destroy();
+      this.playerNameText?.destroy();
+      this.statusText?.destroy();
+      this.game.events.off('mobile-input', this.onMobileInput, this);
     });
 
     // Auto-save a cada 30s (só quando o player está vivo)
@@ -189,6 +238,7 @@ export class MainScene extends Phaser.Scene {
     });
 
     this.game.events.emit('scene-ready', this);
+    this.publishSharedState('Explorando');
   }
 
   update(time) {
@@ -196,39 +246,53 @@ export class MainScene extends Phaser.Scene {
       return;
     }
 
-    const velocity = new Phaser.Math.Vector2(0, 0);
+    let moveX = 0;
+    let moveY = 0;
 
-    const moveLeft = this.cursors.left.isDown || this.wasd.left.isDown;
-    const moveRight = this.cursors.right.isDown || this.wasd.right.isDown;
-    const moveUp = this.cursors.up.isDown || this.wasd.up.isDown;
-    const moveDown = this.cursors.down.isDown || this.wasd.down.isDown;
+    const moveLeft = this.cursors.left.isDown || this.wasd.left.isDown || this.mobileInput.left;
+    const moveRight = this.cursors.right.isDown || this.wasd.right.isDown || this.mobileInput.right;
+    const moveUp = this.cursors.up.isDown || this.wasd.up.isDown || this.mobileInput.up;
+    const moveDown = this.cursors.down.isDown || this.wasd.down.isDown || this.mobileInput.down;
 
     if (moveLeft) {
-      velocity.x -= 1;
+      moveX -= 1;
       this.facing = 'left';
     }
 
     if (moveRight) {
-      velocity.x += 1;
+      moveX += 1;
       this.facing = 'right';
     }
 
     if (moveUp) {
-      velocity.y -= 1;
+      moveY -= 1;
       this.facing = 'up';
     }
 
     if (moveDown) {
-      velocity.y += 1;
+      moveY += 1;
       this.facing = 'down';
     }
 
-    velocity.normalize().scale(getMoveSpeed(this.player.stats, PLAYER_SPEED));
-    this.player.body.setVelocity(velocity.x, velocity.y);
+    const speed = getMoveSpeed(this.player.stats, PLAYER_SPEED);
+    const len = Math.hypot(moveX, moveY) || 1;
+    const velX = (moveX / len) * speed;
+    const velY = (moveY / len) * speed;
+    this.player.body.setVelocity(velX, velY);
 
-    this.updateAnimation(velocity.lengthSq() > 0);
-    this.updateEnemies(time);
+    this.updateAnimation(moveX !== 0 || moveY !== 0);
+
+    if (time - this.lastEnemyUpdateAt >= ENEMY_UPDATE_INTERVAL_MS) {
+      this.lastEnemyUpdateAt = time;
+      this.updateEnemies(time);
+    }
+
     this.tryPlayerAttack(time);
+
+    if (time - this.lastStatePublishAt >= STATE_PUBLISH_INTERVAL_MS) {
+      this.lastStatePublishAt = time;
+      this.publishSharedState(this.getCurrentStatusLabel());
+    }
   }
 
   updateEnemies(time) {
@@ -252,9 +316,14 @@ export class MainScene extends Phaser.Scene {
   }
 
   tryPlayerAttack(time) {
-    if (!Phaser.Input.Keyboard.JustDown(this.attackKey)) {
+    const isKeyboardAttack = Phaser.Input.Keyboard.JustDown(this.attackKey);
+    const isMobileAttack = this.mobileAttackQueued;
+
+    if (!isKeyboardAttack && !isMobileAttack) {
       return;
     }
+
+    this.mobileAttackQueued = false;
 
     if (time - this.lastPlayerAttackAt < PLAYER_ATTACK_COOLDOWN) {
       return;
@@ -313,6 +382,7 @@ export class MainScene extends Phaser.Scene {
     if (!this.enemies || this.enemies.countActive(true) > 0) return;
 
     this.phaseClear = true;
+    this.publishSharedState('Transicao');
 
     if (this.player?.body) {
       this.player.body.setVelocity(0, 0);
@@ -365,6 +435,73 @@ export class MainScene extends Phaser.Scene {
     );
   }
 
+  getCurrentStatusLabel() {
+    if (this.phaseClear) return 'Transicao';
+
+    if (this.enemies) {
+      let isBossAlive = false;
+      let closeEnemy = false;
+
+      this.enemies.children.iterate((entity) => {
+        if (!entity?.active) return;
+        if (entity.isBoss) {
+          isBossAlive = true;
+        }
+
+        if (!closeEnemy) {
+          const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, entity.x, entity.y);
+          if (dist < 130) {
+            closeEnemy = true;
+          }
+        }
+      });
+
+      if (isBossAlive) return 'Boss Fight';
+      if (closeEnemy) return 'Combate';
+    }
+
+    return 'Explorando';
+  }
+
+  publishSharedState(statusLabel) {
+    const snapshot = {
+      playerName: this.playerName,
+      phase: this.startPhase,
+      hp: this.player.stats.health,
+      maxHp: this.player.stats.maxHealth,
+      status: statusLabel,
+      inventory: {
+        health: this.inventory.health,
+        strength: this.inventory.strength,
+        speed: this.inventory.speed,
+      },
+    };
+
+    this.stateStore?.patch(snapshot);
+    this.socketSync?.publishLocalState(snapshot);
+
+    if (this.statusText) {
+      this.statusText.setText(`Status: ${statusLabel}`);
+      this.statusText.setColor(statusLabel === 'Boss Fight' ? '#ff9090' : '#bde5b8');
+    }
+  }
+
+  onMobileInput(payload) {
+    const next = {
+      up: Boolean(payload?.up),
+      down: Boolean(payload?.down),
+      left: Boolean(payload?.left),
+      right: Boolean(payload?.right),
+      attack: Boolean(payload?.attack),
+    };
+
+    if (!this.mobileInput.attack && next.attack) {
+      this.mobileAttackQueued = true;
+    }
+
+    this.mobileInput = next;
+  }
+
   onPlayerEnemyOverlap(player, enemy) {
     // Stomp do boss encurta o cooldown de contato (ataque mais rápido)
     const isStomping = enemy.isBoss && enemy.ai?.bossMode === 'stomp';
@@ -379,11 +516,13 @@ export class MainScene extends Phaser.Scene {
 
     if (didTakeDamage) {
       this.playerHealthBar?.update();
+      this.publishSharedState(this.getCurrentStatusLabel());
     }
 
     if (isDead(player.stats)) {
       player.body.setVelocity(0, 0);
       this.phaseClear = true; // congela o update loop
+      this.publishSharedState('Derrota');
 
       this.time.delayedCall(450, () => {
         this.scene.launch(OVERLAY_SCENE_KEY, { type: 'defeat', phase: this.startPhase });
@@ -435,6 +574,12 @@ export class MainScene extends Phaser.Scene {
       return;
     }
 
+    if (typeof data.playerName === 'string' && data.playerName.trim().length > 0) {
+      this.playerName = data.playerName.trim();
+      this.registry.set('playerName', this.playerName);
+      this.playerNameText?.setText(`Jogador: ${this.playerName}`);
+    }
+
     const maxHp = safeNum(data.player.stats.maxHealth, 1, 9999);
     this.player.stats.maxHealth = maxHp;
     this.player.stats.health = safeNum(data.player.stats.health, 1, maxHp);
@@ -453,6 +598,7 @@ export class MainScene extends Phaser.Scene {
 
     this.playerHealthBar?.update();
     this.updateInventoryHud();
+    this.publishSharedState(this.getCurrentStatusLabel());
   }
 
   handleResize(gameSize) {
