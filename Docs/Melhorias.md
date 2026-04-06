@@ -1,0 +1,6 @@
+- Ter um botão de Pausa
+- Ter uma opção apra reiniciar a fase
+- Ter um botão para reiniciar tudo
+- Assim que concluir a fase ele auto recolher os itens ou ter um timer para que o jogador possa recolher tudo antes de ir para a próxima fase
+- Um mini mapa do mapa
+- Mostrar a quantidade inimígos vivos (Exemplo: 4/15)

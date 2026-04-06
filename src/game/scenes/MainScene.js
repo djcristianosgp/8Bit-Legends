@@ -11,8 +11,11 @@ import { performPlayerAttack, processContactDamage } from '../combat/combatSyste
 import { getAttackValue, getMoveSpeed, isDead, applyDamage, calculateDamage } from '../combat/stats';
 import { ArrowSystem } from '../systems/ArrowSystem';
 import { ShieldSystem } from '../systems/ShieldSystem';
+import { SkillSystem } from '../systems/SkillSystem';
+import { WeaponSystem } from '../systems/WeaponSystem';
+import { LootSystem } from '../systems/LootSystem';
 import { createInventory, addItemToInventory } from '../items/inventory';
-import { ITEM_CONFIG, rollEnemyDrop } from '../items/itemDefinitions';
+import { ITEM_CONFIG } from '../items/itemDefinitions';
 import { applyItemEffect } from '../items/itemEffects';
 import { createDropGroup, showCollectFeedback, spawnItemDrop } from '../items/dropSystem';
 import { getPhaseConfig, getDifficultyFactor, TOTAL_PHASES } from '../phases/phaseConfig';
@@ -67,6 +70,9 @@ export class MainScene extends Phaser.Scene {
     // Systems
     this.arrowSystem = null;
     this.shieldSystem = null;
+    this.skillSystem = null;
+    this.weaponSystem = null;
+    this.lootSystem = null;
   }
 
   /**
@@ -129,6 +135,10 @@ export class MainScene extends Phaser.Scene {
     this.player.anims.play(PLAYER_ANIMS.idleDown, true);
     this.physics.add.collider(this.player, mapState.wallLayer);
     this.playerHealthBar = createPlayerHealthBar(this, this.player.stats);
+
+    this.weaponSystem = new WeaponSystem(this);
+    this.weaponSystem.create(this.player);
+    this.lootSystem = new LootSystem(this);
 
     // ── HUD: inventário ────────────────────────────────────────────────────
     this.inventory = createInventory();
@@ -220,11 +230,7 @@ export class MainScene extends Phaser.Scene {
       this.enemies,
       (arrow, enemy) => {
         this.arrowSystem.processArrowEnemyCollision(arrow, enemy, (defeatedEnemy) => {
-          const dropType = rollEnemyDrop();
-          if (dropType) {
-            spawnItemDrop(this, this.itemDrops, dropType, defeatedEnemy.x, defeatedEnemy.y);
-          }
-          this.time.delayedCall(50, () => this.checkPhaseClear());
+          this.handleEnemyDefeat(defeatedEnemy);
         });
       },
       null,
@@ -234,6 +240,11 @@ export class MainScene extends Phaser.Scene {
     // ── Shield System ─────────────────────────────────────────────────────────
     this.shieldSystem = new ShieldSystem(this);
     this.shieldSystem.create(this.player);
+
+    this.skillSystem = new SkillSystem(this, {
+      onEnemyDefeated: (enemy) => this.handleEnemyDefeat(enemy),
+    });
+    this.skillSystem.create(this.player, this.enemies);
 
     // ── Câmera ─────────────────────────────────────────────────────────────
     const camera = this.cameras.main;
@@ -265,6 +276,9 @@ export class MainScene extends Phaser.Scene {
       this.game.events.off('mobile-input', this.onMobileInput, this);
       this.arrowSystem?.destroy();
       this.shieldSystem?.destroy();
+      this.skillSystem?.destroy();
+      this.weaponSystem = null;
+      this.lootSystem = null;
     });
 
     // Auto-save a cada 30s (só quando o player está vivo)
@@ -333,9 +347,11 @@ export class MainScene extends Phaser.Scene {
     // Update systems
     this.arrowSystem?.update(time, this.player, this.enemies);
     this.shieldSystem?.update(time);
+    this.skillSystem?.update(time, this.player, this.enemies, this.facing);
 
     if (time - this.lastStatePublishAt >= STATE_PUBLISH_INTERVAL_MS) {
       this.lastStatePublishAt = time;
+      this.updateInventoryHud();
       this.publishSharedState(this.getCurrentStatusLabel());
     }
   }
@@ -370,7 +386,10 @@ export class MainScene extends Phaser.Scene {
 
     this.mobileAttackQueued = false;
 
-    if (time - this.lastPlayerAttackAt < PLAYER_ATTACK_COOLDOWN) {
+    const attackCooldown =
+      PLAYER_ATTACK_COOLDOWN / (this.weaponSystem?.getAttackSpeedMultiplier() ?? 1);
+
+    if (time - this.lastPlayerAttackAt < attackCooldown) {
       return;
     }
 
@@ -382,26 +401,58 @@ export class MainScene extends Phaser.Scene {
       facing: this.facing,
       now: time,
       onEnemyDefeated: (enemy) => {
-        const dropType = rollEnemyDrop();
-
-        if (dropType) {
-          spawnItemDrop(this, this.itemDrops, dropType, enemy.x, enemy.y);
-        }
-
-        // Verifica limpeza da fase após a iteração acabar
-        this.time.delayedCall(50, () => this.checkPhaseClear());
+        this.handleEnemyDefeat(enemy);
       },
     });
   }
 
+  handleEnemyDefeat(enemy) {
+    const dropData = this.lootSystem?.rollDrop(enemy);
+
+    if (dropData) {
+      spawnItemDrop(this, this.itemDrops, dropData, enemy.x, enemy.y);
+    }
+
+    this.time.delayedCall(50, () => this.checkPhaseClear());
+  }
+
   onPlayerCollectDrop(player, drop) {
-    if (!drop?.active || !drop.itemType) {
+    const dropData =
+      drop?.dropData ??
+      (drop?.itemType
+        ? {
+            kind: 'item',
+            itemType: drop.itemType,
+            label: ITEM_CONFIG[drop.itemType]?.label ?? 'Item',
+            textColor: '#f8f3e6',
+            rarity: 'common',
+          }
+        : null);
+
+    if (!drop?.active || !dropData) {
       return;
     }
 
-    const itemType = drop.itemType;
+    if (dropData.kind === 'weapon' && dropData.weaponId) {
+      this.weaponSystem?.equipWeapon(dropData.weaponId, dropData.rarity);
+      this.updateInventoryHud();
+      this.publishSharedState(this.getCurrentStatusLabel());
+      drop.destroy();
+      return;
+    }
+
+    const itemType = dropData.itemType;
     const itemConfig = ITEM_CONFIG[itemType];
-    const effectText = applyItemEffect({ player, itemType });
+    if (!itemConfig) {
+      drop.destroy();
+      return;
+    }
+
+    const effectText = applyItemEffect({
+      player,
+      itemType,
+      rarity: dropData.rarity,
+    });
 
     addItemToInventory(this.inventory, itemType);
     this.playerHealthBar?.update();
@@ -411,8 +462,8 @@ export class MainScene extends Phaser.Scene {
       this,
       drop.x,
       drop.y,
-      `${itemConfig.label} ${effectText}`,
-      '#f8f3e6',
+      `${dropData.label} ${effectText}`.trim(),
+      dropData.textColor ?? '#f8f3e6',
     );
 
     drop.destroy();
@@ -478,11 +529,18 @@ export class MainScene extends Phaser.Scene {
 
     const attackTotal = getAttackValue(this.player.stats);
     const speedTotal = getMoveSpeed(this.player.stats, PLAYER_SPEED);
+    const weaponLabel = this.weaponSystem?.getWeaponLabel() ?? 'Common Sword [melee]';
+    const skillLines = this.skillSystem?.getHudLines(this.time.now) ?? [
+      'Skills Q:--  W:--  E:--',
+      'Aura inativa',
+    ];
 
     this.inventoryText.setText(
       [
         `Itens  Vida:${this.inventory.health}  Forca:${this.inventory.strength}  Vel:${this.inventory.speed}`,
+        `Arma  ${weaponLabel}`,
         `Atributos  ATQ:${attackTotal}  DEF:${this.player.stats.defense}  MOV:${Math.round(speedTotal)}`,
+        ...skillLines,
       ].join('\n'),
     );
   }
@@ -645,6 +703,10 @@ export class MainScene extends Phaser.Scene {
       this.playerName = data.playerName.trim();
       this.registry.set('playerName', this.playerName);
       this.playerNameText?.setText(`Nome ${this.playerName}`);
+    }
+
+    if (data.weapon?.id && this.weaponSystem) {
+      this.weaponSystem.equipWeapon(data.weapon.id, data.weapon.rarity, { silent: true });
     }
 
     const maxHp = safeNum(data.player.stats.maxHealth, 1, 9999);

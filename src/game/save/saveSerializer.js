@@ -20,4 +20,5 @@ export const serializeScene = (scene) => ({
     },
   },
   inventory: { ...scene.inventory },
+  weapon: scene.weaponSystem?.serialize() ?? null,
 });

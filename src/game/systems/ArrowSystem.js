@@ -46,8 +46,11 @@ export class ArrowSystem {
       return;
     }
 
-    // Tenta disparar nova flecha a cada ARROW_SPAWN_INTERVAL
-    if (time - this.lastArrowSpawnAt >= ARROW_SPAWN_INTERVAL) {
+    const attackSpeedMultiplier = this.scene.weaponSystem?.getAttackSpeedMultiplier() ?? 1;
+    const spawnInterval = Math.max(360, ARROW_SPAWN_INTERVAL / attackSpeedMultiplier);
+
+    // Tenta disparar nova flecha respeitando a velocidade da arma equipada
+    if (time - this.lastArrowSpawnAt >= spawnInterval) {
       this.lastArrowSpawnAt = time;
       this.spawnArrow(player, enemies);
     }
@@ -95,7 +98,10 @@ export class ArrowSystem {
     arrow.setOrigin(0.5, 0.5);
     arrow.setScale(1.5);
     arrow.setDepth(1);
-    arrow.setData('damage', this.baseDamage + this.phase * 2);
+
+    const baseDamage = this.baseDamage + this.phase * 2;
+    const adjustedDamage = this.scene.weaponSystem?.getArrowDamage(baseDamage) ?? baseDamage;
+    arrow.setData('damage', adjustedDamage);
 
     // Configuração do body física
     arrow.body.setBounce(0, 0);
@@ -201,6 +207,7 @@ export class ArrowSystem {
     if (isDead(enemy.stats)) {
       onEnemyDefeated(enemy);
       enemy.healthBar?.destroy();
+      enemy.destroy();
       return true;
     }
 

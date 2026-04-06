@@ -7,9 +7,11 @@ export const createCombatStats = ({ maxHealth, attack, defense }) => ({
   defense,
   bonusAttack: 0,
   bonusSpeed: 0,
+  weaponAttackBonus: 0,
 });
 
-export const getAttackValue = (stats) => stats.attack + (stats.bonusAttack ?? 0);
+export const getAttackValue = (stats) =>
+  stats.attack + (stats.bonusAttack ?? 0) + (stats.weaponAttackBonus ?? 0);
 
 export const getMoveSpeed = (stats, baseSpeed) => baseSpeed + (stats.bonusSpeed ?? 0);
 
