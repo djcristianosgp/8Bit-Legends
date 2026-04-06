@@ -18,6 +18,10 @@ Projeto de jogo web com React (Vite) e Phaser.js.
 - Inimigos com patrulha aleatoria e perseguicao por proximidade
 - Sistema de combate com ataque do player e dano por atributos
 - Barra de vida do player e barras de vida dos inimigos
+- Sistema de itens com drops de inimigos
+- Itens de vida, forca e velocidade
+- Inventario simples com contadores e atributos em HUD
+- Feedback visual ao coletar itens
 - Preparado para deploy na Vercel (`vercel.json`)
 - Layout responsivo e leve
 - `.gitignore` configurado
@@ -41,6 +45,11 @@ src/
       combatSystem.js
       healthBars.js
       stats.js
+    items/
+      dropSystem.js
+      inventory.js
+      itemDefinitions.js
+      itemEffects.js
     maps/
       definitions/
         starterFieldMap.js
@@ -70,6 +79,15 @@ npm run dev
 
 - Movimento: setas ou WASD
 - Ataque: ESPACO
+
+## Sistema de itens
+
+- Inimigos derrotados podem dropar itens por chance.
+- Tipos atuais:
+  - Vida: cura parte do HP
+  - Forca: aumenta atributo de ataque
+  - Velocidade: aumenta velocidade de movimento
+- Inventario registra quantidade coletada por tipo.
 
 ## Build de producao
 

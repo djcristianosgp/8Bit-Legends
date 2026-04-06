@@ -7,7 +7,11 @@ import { createEnemy } from '../entities/createEnemy';
 import { updateEnemyBehavior } from '../ai/enemyBehavior';
 import { attachEnemyHealthBar, createPlayerHealthBar } from '../combat/healthBars';
 import { performPlayerAttack, processContactDamage } from '../combat/combatSystem';
-import { isDead } from '../combat/stats';
+import { getAttackValue, getMoveSpeed, isDead } from '../combat/stats';
+import { createInventory, addItemToInventory } from '../items/inventory';
+import { ITEM_CONFIG, rollEnemyDrop } from '../items/itemDefinitions';
+import { applyItemEffect } from '../items/itemEffects';
+import { createDropGroup, showCollectFeedback, spawnItemDrop } from '../items/dropSystem';
 
 const PLAYER_SPEED = 180;
 const PLAYER_ATTACK_COOLDOWN = 280;
@@ -24,6 +28,9 @@ export class MainScene extends Phaser.Scene {
     this.attackKey = null;
     this.playerHealthBar = null;
     this.lastPlayerAttackAt = -10000;
+    this.itemDrops = null;
+    this.inventory = null;
+    this.inventoryText = null;
   }
 
   preload() {
@@ -44,6 +51,22 @@ export class MainScene extends Phaser.Scene {
     this.player.anims.play(PLAYER_ANIMS.idleDown, true);
     this.physics.add.collider(this.player, mapState.wallLayer);
     this.playerHealthBar = createPlayerHealthBar(this, this.player.stats);
+
+    this.inventory = createInventory();
+    this.inventoryText = this.add
+      .text(14, 34, '', {
+        fontFamily: 'Trebuchet MS, sans-serif',
+        fontSize: '13px',
+        color: '#f8f3e6',
+        stroke: '#1b1f2d',
+        strokeThickness: 3,
+      })
+      .setScrollFactor(0)
+      .setDepth(31);
+    this.updateInventoryHud();
+
+    this.itemDrops = createDropGroup(this);
+    this.physics.add.overlap(this.player, this.itemDrops, this.onPlayerCollectDrop, null, this);
 
     this.enemies = this.physics.add.group();
     mapState.enemySpawnPoints.forEach((spawn) => {
@@ -75,6 +98,7 @@ export class MainScene extends Phaser.Scene {
       this.scale.off('resize', this.handleResize, this);
       this.playerHealthBar?.destroy();
       this.enemies?.children.iterate((enemy) => enemy?.healthBar?.destroy());
+      this.inventoryText?.destroy();
     });
   }
 
@@ -110,7 +134,7 @@ export class MainScene extends Phaser.Scene {
       this.facing = 'down';
     }
 
-    velocity.normalize().scale(PLAYER_SPEED);
+    velocity.normalize().scale(getMoveSpeed(this.player.stats, PLAYER_SPEED));
     this.player.body.setVelocity(velocity.x, velocity.y);
 
     this.updateAnimation(velocity.lengthSq() > 0);
@@ -149,7 +173,54 @@ export class MainScene extends Phaser.Scene {
       enemies: this.enemies,
       facing: this.facing,
       now: time,
+      onEnemyDefeated: (enemy) => {
+        const dropType = rollEnemyDrop();
+
+        if (dropType) {
+          spawnItemDrop(this, this.itemDrops, dropType, enemy.x, enemy.y);
+        }
+      },
     });
+  }
+
+  onPlayerCollectDrop(player, drop) {
+    if (!drop?.active || !drop.itemType) {
+      return;
+    }
+
+    const itemType = drop.itemType;
+    const itemConfig = ITEM_CONFIG[itemType];
+    const effectText = applyItemEffect({ player, itemType });
+
+    addItemToInventory(this.inventory, itemType);
+    this.playerHealthBar?.update();
+    this.updateInventoryHud();
+
+    showCollectFeedback(
+      this,
+      drop.x,
+      drop.y,
+      `${itemConfig.label} ${effectText}`,
+      '#f8f3e6',
+    );
+
+    drop.destroy();
+  }
+
+  updateInventoryHud() {
+    if (!this.inventoryText || !this.player) {
+      return;
+    }
+
+    const attackTotal = getAttackValue(this.player.stats);
+    const speedTotal = getMoveSpeed(this.player.stats, PLAYER_SPEED);
+
+    this.inventoryText.setText(
+      [
+        `Itens  Vida:${this.inventory.health}  Forca:${this.inventory.strength}  Vel:${this.inventory.speed}`,
+        `Atributos  ATQ:${attackTotal}  DEF:${this.player.stats.defense}  MOV:${Math.round(speedTotal)}`,
+      ].join('\n'),
+    );
   }
 
   onPlayerEnemyOverlap(player, enemy) {

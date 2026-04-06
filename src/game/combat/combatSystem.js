@@ -31,7 +31,14 @@ const isEnemyInsideAttackCone = (player, enemy, facing) => {
   return Math.abs(angle) <= ATTACK_ARC;
 };
 
-export const performPlayerAttack = ({ scene, player, enemies, facing, now }) => {
+export const performPlayerAttack = ({
+  scene,
+  player,
+  enemies,
+  facing,
+  now,
+  onEnemyDefeated = () => {},
+}) => {
   let hitCount = 0;
 
   enemies.children.iterate((enemy) => {
@@ -52,6 +59,7 @@ export const performPlayerAttack = ({ scene, player, enemies, facing, now }) => 
     }
 
     if (isDead(enemy.stats)) {
+      onEnemyDefeated(enemy);
       enemy.healthBar?.destroy();
       enemy.destroy();
     }
