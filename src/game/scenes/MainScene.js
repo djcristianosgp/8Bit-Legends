@@ -8,7 +8,9 @@ import { updateEnemyBehavior } from '../ai/enemyBehavior';
 import { updateBossBehavior } from '../ai/bossBehavior';
 import { attachEnemyHealthBar, createPlayerHealthBar } from '../combat/healthBars';
 import { performPlayerAttack, processContactDamage } from '../combat/combatSystem';
-import { getAttackValue, getMoveSpeed, isDead } from '../combat/stats';
+import { getAttackValue, getMoveSpeed, isDead, applyDamage, calculateDamage } from '../combat/stats';
+import { ArrowSystem } from '../systems/ArrowSystem';
+import { ShieldSystem } from '../systems/ShieldSystem';
 import { createInventory, addItemToInventory } from '../items/inventory';
 import { ITEM_CONFIG, rollEnemyDrop } from '../items/itemDefinitions';
 import { applyItemEffect } from '../items/itemEffects';
@@ -61,6 +63,10 @@ export class MainScene extends Phaser.Scene {
 
     this.lastEnemyUpdateAt = 0;
     this.lastStatePublishAt = 0;
+
+    // Systems
+    this.arrowSystem = null;
+    this.shieldSystem = null;
   }
 
   /**
@@ -97,7 +103,15 @@ export class MainScene extends Phaser.Scene {
       frameHeight: 32,
     });
 
+    // Carrega todos os tilesets de biomas
     this.load.image('tiles-rpg', '/assets/tiles/rpg_tileset.png');
+    this.load.image('tiles-forest', '/assets/tiles/biome_forest.png');
+    this.load.image('tiles-ruins', '/assets/tiles/biome_ruins.png');
+    this.load.image('tiles-volcano', '/assets/tiles/biome_volcano.png');
+    this.load.image('tiles-crystal', '/assets/tiles/biome_crystal.png');
+
+    this.load.image('arrow', '/assets/sprites/arrow.png');
+    this.load.image('shield', '/assets/sprites/shield.png');
   }
 
   create() {
@@ -107,7 +121,7 @@ export class MainScene extends Phaser.Scene {
     this.phaseClear = false;
     this.currentMapId = phaseConfig.mapId;
 
-    const mapState = loadMap(this, this.currentMapId);
+    const mapState = loadMap(this, this.currentMapId, this.startPhase);
     this.worldSize = mapState.worldSize;
 
     createPlayerAnimations(this);
@@ -180,6 +194,10 @@ export class MainScene extends Phaser.Scene {
       this.enemies.add(enemy);
     });
 
+    // ── Arrow System ───────────────────────────────────────────────────────────
+    this.arrowSystem = new ArrowSystem(this, this.startPhase);
+    this.arrowSystem.create();
+
     // ── Boss (apenas em fases pares) ───────────────────────────────────────
     if (phaseConfig.isBoss && mapState.bossSpawnPoint) {
       const boss = createBoss(
@@ -195,6 +213,27 @@ export class MainScene extends Phaser.Scene {
     this.physics.add.collider(this.enemies, mapState.wallLayer);
     this.physics.add.collider(this.enemies, this.enemies);
     this.physics.add.overlap(this.player, this.enemies, this.onPlayerEnemyOverlap, null, this);
+
+    // ── Arrow-Enemy Collisions ─────────────────────────────────────────────────
+    this.physics.add.overlap(
+      this.arrowSystem.getGroup(),
+      this.enemies,
+      (arrow, enemy) => {
+        this.arrowSystem.processArrowEnemyCollision(arrow, enemy, (defeatedEnemy) => {
+          const dropType = rollEnemyDrop();
+          if (dropType) {
+            spawnItemDrop(this, this.itemDrops, dropType, defeatedEnemy.x, defeatedEnemy.y);
+          }
+          this.time.delayedCall(50, () => this.checkPhaseClear());
+        });
+      },
+      null,
+      this,
+    );
+
+    // ── Shield System ─────────────────────────────────────────────────────────
+    this.shieldSystem = new ShieldSystem(this);
+    this.shieldSystem.create(this.player);
 
     // ── Câmera ─────────────────────────────────────────────────────────────
     const camera = this.cameras.main;
@@ -224,6 +263,8 @@ export class MainScene extends Phaser.Scene {
       this.playerNameText?.destroy();
       this.statusText?.destroy();
       this.game.events.off('mobile-input', this.onMobileInput, this);
+      this.arrowSystem?.destroy();
+      this.shieldSystem?.destroy();
     });
 
     // Auto-save a cada 30s (só quando o player está vivo)
@@ -288,6 +329,10 @@ export class MainScene extends Phaser.Scene {
     }
 
     this.tryPlayerAttack(time);
+
+    // Update systems
+    this.arrowSystem?.update(time, this.player, this.enemies);
+    this.shieldSystem?.update(time);
 
     if (time - this.lastStatePublishAt >= STATE_PUBLISH_INTERVAL_MS) {
       this.lastStatePublishAt = time;
@@ -507,12 +552,23 @@ export class MainScene extends Phaser.Scene {
     const isStomping = enemy.isBoss && enemy.ai?.bossMode === 'stomp';
     const cooldownMs = isStomping ? 300 : 850;
 
-    const didTakeDamage = processContactDamage({
+    let didTakeDamage = processContactDamage({
       player,
       enemy,
       now: this.time.now,
       cooldownMs,
     });
+
+    // Apply shield damage reduction
+    if (didTakeDamage && this.shieldSystem?.isShieldActive()) {
+      const shieldReduction = this.shieldSystem.getDamageReductionFactor();
+      // Recalculate damage based on shield reduction
+      const actualDamage = Math.floor(calculateDamage(enemy.stats, player.stats) * shieldReduction);
+      const healBack = calculateDamage(enemy.stats, player.stats) - actualDamage;
+      if (healBack > 0) {
+        player.stats.health = Math.min(player.stats.health + healBack, player.stats.maxHealth);
+      }
+    }
 
     if (didTakeDamage) {
       this.playerHealthBar?.update();

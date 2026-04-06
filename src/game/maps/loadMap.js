@@ -1,8 +1,10 @@
 import { TILE_INDEX, TILE_SIZE } from './mapConstants';
 import { getMapById } from './mapRegistry';
+import { getBiomeConfig } from './biomeConfig';
 
-export const loadMap = (scene, mapId) => {
+export const loadMap = (scene, mapId, phase = 1) => {
   const mapData = getMapById(mapId);
+  const biomeConfig = getBiomeConfig(phase);
 
   const map = scene.make.tilemap({
     width: mapData.width,
@@ -11,7 +13,8 @@ export const loadMap = (scene, mapId) => {
     tileHeight: TILE_SIZE,
   });
 
-  const tileset = map.addTilesetImage('rpg_tileset', 'tiles-rpg');
+  // Usa o tileset do bioma correspondente à fase
+  const tileset = map.addTilesetImage(biomeConfig.key, biomeConfig.imageKey);
 
   if (!tileset) {
     throw new Error('Falha ao criar tileset do mapa.');
