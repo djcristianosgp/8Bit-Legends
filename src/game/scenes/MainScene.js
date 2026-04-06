@@ -74,6 +74,10 @@ export class MainScene extends Phaser.Scene {
    * ou, na primeira carga, lê do localStorage para restaurar o progresso.
    */
   init(data) {
+    this.playerName = (this.registry.get('playerName') ?? 'Heroi').trim() || 'Heroi';
+    this.stateStore = this.registry.get('stateStore') ?? null;
+    this.socketSync = this.registry.get('socketSync') ?? null;
+
     if (data?.phase != null) {
       this.startPhase = Math.max(1, Math.min(TOTAL_PHASES, Number(data.phase) || 1));
       return;
@@ -91,10 +95,6 @@ export class MainScene extends Phaser.Scene {
     } catch {
       this.startPhase = 1;
     }
-
-    this.playerName = (this.registry.get('playerName') ?? 'Heroi').trim() || 'Heroi';
-    this.stateStore = this.registry.get('stateStore') ?? null;
-    this.socketSync = this.registry.get('socketSync') ?? null;
   }
 
   preload() {
@@ -439,12 +439,19 @@ export class MainScene extends Phaser.Scene {
     try {
       const saveData = serializeScene(this);
       saveData.phase = isFinal ? 1 : this.startPhase + 1;
+      saveData.restoreFullHealth = true;
+
+      if (saveData.player?.stats) {
+        saveData.player.stats.health = saveData.player.stats.maxHealth;
+      }
+
       writeToStorage(saveData);
     } catch {
       // Falha silenciosa; o save manual ainda está disponível
     }
 
     this.time.delayedCall(700, () => {
+      this.scene.pause();
       this.scene.launch(OVERLAY_SCENE_KEY, {
         type: isFinal ? 'gameover' : 'victory',
         phase: this.startPhase,
@@ -581,6 +588,7 @@ export class MainScene extends Phaser.Scene {
       this.publishSharedState('Derrota');
 
       this.time.delayedCall(450, () => {
+        this.scene.pause();
         this.scene.launch(OVERLAY_SCENE_KEY, { type: 'defeat', phase: this.startPhase });
       });
     }
@@ -617,6 +625,9 @@ export class MainScene extends Phaser.Scene {
   applySave(data) {
     const safeNum = (v, min, max) => Math.min(Math.max(Number(v) || 0, min), max);
     const VALID_FACINGS = ['down', 'up', 'left', 'right'];
+    const shouldRestoreFullHealth =
+      data?.restoreFullHealth === true ||
+      (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('8bl_restore_full_hp') === '1');
 
     // Se a fase salva for diferente da atual, reinicia na fase correta.
     // Isso garante que "Importar save" troque de fase corretamente.
@@ -638,7 +649,9 @@ export class MainScene extends Phaser.Scene {
 
     const maxHp = safeNum(data.player.stats.maxHealth, 1, 9999);
     this.player.stats.maxHealth = maxHp;
-    this.player.stats.health = safeNum(data.player.stats.health, 1, maxHp);
+    this.player.stats.health = shouldRestoreFullHealth
+      ? maxHp
+      : safeNum(data.player.stats.health, 1, maxHp);
     this.player.stats.attack = safeNum(data.player.stats.attack, 0, 999);
     this.player.stats.defense = safeNum(data.player.stats.defense, 0, 999);
     this.player.stats.bonusAttack = safeNum(data.player.stats.bonusAttack, 0, 999);
@@ -651,6 +664,29 @@ export class MainScene extends Phaser.Scene {
     this.inventory.health = safeNum(data.inventory.health, 0, 9999);
     this.inventory.strength = safeNum(data.inventory.strength, 0, 9999);
     this.inventory.speed = safeNum(data.inventory.speed, 0, 9999);
+
+    if (shouldRestoreFullHealth) {
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem('8bl_restore_full_hp');
+        }
+
+        writeToStorage({
+          ...data,
+          restoreFullHealth: false,
+          player: {
+            ...data.player,
+            stats: {
+              ...data.player.stats,
+              maxHealth: maxHp,
+              health: maxHp,
+            },
+          },
+        });
+      } catch {
+        // Falha silenciosa ao limpar a flag de restauração
+      }
+    }
 
     this.playerHealthBar?.update();
     this.updateInventoryHud();

@@ -11,7 +11,7 @@ function App() {
   const fileInputRef = useRef(null);
   const toastTimeoutRef = useRef(null);
 
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(() => localStorage.getItem('8bl_autostart') === '1');
   const [playerName, setPlayerName] = useState(() => localStorage.getItem('8bl_player_name') ?? 'Heroi');
   const [toast, setToast] = useState(null);
   const [hud, setHud] = useState({
@@ -99,6 +99,7 @@ function App() {
   };
 
   const startGame = () => {
+    localStorage.setItem('8bl_autostart', '1');
     setStarted(true);
   };
 

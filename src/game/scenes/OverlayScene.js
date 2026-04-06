@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { TOTAL_PHASES } from '../phases/phaseConfig';
+import { readFromStorage, writeToStorage } from '../save/saveStorage';
 
 export const OVERLAY_SCENE_KEY = 'OverlayScene';
 
@@ -20,6 +21,9 @@ export class OverlayScene extends Phaser.Scene {
     this.overlayType = data.type;
     this.phase = data.phase ?? 1;
     this.nextPhase = data.nextPhase ?? 2;
+    this.countdownSeconds = 15;
+    this.countdownEvent = null;
+    this.actionText = null;
     this._confirmed = false;
   }
 
@@ -92,7 +96,7 @@ export class OverlayScene extends Phaser.Scene {
 
     // ── Dica de controle ──────────────────────────────────────────────────────
     this.add
-      .text(width / 2, height / 2 + 52, 'ENTER  ou  clique  para continuar', {
+      .text(width / 2, height / 2 + 52, 'Clique no botão ou aguarde a contagem.', {
         fontFamily: 'Trebuchet MS, sans-serif',
         fontSize: '13px',
         color: '#7a7090',
@@ -118,14 +122,60 @@ export class OverlayScene extends Phaser.Scene {
         .setDepth(50);
     }
 
-    // ── Entrada ───────────────────────────────────────────────────────────────
-    this.input.keyboard.once('keydown-ENTER', () => this._confirm());
-    this.input.once('pointerdown', () => this._confirm());
+    const actionLabel = isDefeat
+      ? 'Tentar novamente'
+      : isGameOver
+        ? 'Reiniciar jornada'
+        : 'Próxima fase';
+
+    const buttonY = height / 2 + (isDefeat ? 100 : 92);
+
+    const buttonBg = this.add
+      .rectangle(width / 2, buttonY, 220, 42, 0x284879, 0.96)
+      .setStrokeStyle(2, 0xe7b95a, 1)
+      .setScrollFactor(0)
+      .setDepth(50)
+      .setInteractive({ useHandCursor: true });
+
+    this.actionText = this.add
+      .text(width / 2, buttonY, `${actionLabel} (${this.countdownSeconds}s)`, {
+        fontFamily: 'Trebuchet MS, sans-serif',
+        fontSize: '16px',
+        color: '#f8f3e6',
+        stroke: '#06090f',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(51)
+      .setInteractive({ useHandCursor: true });
+
+    buttonBg.on('pointerdown', () => this._confirm());
+    this.actionText.on('pointerdown', () => this._confirm());
+
+    this.input.keyboard?.once('keydown-ENTER', () => this._confirm());
+    this.input.keyboard?.once('keydown-SPACE', () => this._confirm());
+
+    this.countdownEvent = this.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => {
+        this.countdownSeconds -= 1;
+
+        if (this.countdownSeconds <= 0) {
+          this._confirm();
+          return;
+        }
+
+        this.actionText?.setText(`${actionLabel} (${this.countdownSeconds}s)`);
+      },
+    });
   }
 
   _confirm() {
     if (this._confirmed) return;
     this._confirmed = true;
+    this.countdownEvent?.remove(false);
 
     const targetPhase =
       this.overlayType === 'defeat'
@@ -134,8 +184,47 @@ export class OverlayScene extends Phaser.Scene {
           ? 1
           : this.nextPhase;
 
+    this.actionText?.setText('Carregando...');
+
+    try {
+      localStorage.setItem('8bl_autostart', '1');
+
+      const saved = readFromStorage();
+      if (saved && typeof saved === 'object') {
+        const nextSave = {
+          ...saved,
+          phase: targetPhase,
+          timestamp: Date.now(),
+          restoreFullHealth: this.overlayType !== 'defeat',
+        };
+
+        if (this.overlayType !== 'defeat') {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('8bl_restore_full_hp', '1');
+          }
+
+          if (nextSave.player?.stats) {
+            nextSave.player.stats.health = nextSave.player.stats.maxHealth;
+          }
+        }
+
+        writeToStorage(nextSave);
+      }
+    } catch {
+      // fallback silencioso; o reload ainda restaura a fase quando houver save válido
+    }
+
+    const mainScene = this.scene.get('MainScene');
+    mainScene?.scene?.stop();
     this.scene.stop(OVERLAY_SCENE_KEY);
-    this.scene.stop('MainScene');
+
+    if (typeof window !== 'undefined' && window.location) {
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 150);
+      return;
+    }
+
     this.scene.start('MainScene', { phase: targetPhase });
   }
 }
