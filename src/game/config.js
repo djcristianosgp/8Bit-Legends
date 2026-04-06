@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { MainScene } from './scenes/MainScene';
+import { OverlayScene } from './scenes/OverlayScene';
 
 export const createGameConfig = (parent) => ({
   type: Phaser.AUTO,
@@ -24,5 +25,5 @@ export const createGameConfig = (parent) => ({
       debug: false,
     },
   },
-  scene: [MainScene],
+  scene: [MainScene, OverlayScene],
 });

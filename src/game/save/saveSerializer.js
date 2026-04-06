@@ -3,7 +3,8 @@ import { SAVE_VERSION } from './saveSchema';
 export const serializeScene = (scene) => ({
   version: SAVE_VERSION,
   timestamp: Date.now(),
-  mapId: scene.currentMapId ?? 'starter-field',
+  phase: scene.startPhase ?? 1,
+  mapId: scene.currentMapId ?? 'phase-1',
   player: {
     x: Math.round(scene.player.x),
     y: Math.round(scene.player.y),

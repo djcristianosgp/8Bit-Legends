@@ -31,6 +31,13 @@ export const loadMap = (scene, mapId) => {
 
   scene.physics.world.setBounds(0, 0, worldWidth, worldHeight);
 
+  const bossSpawnPoint = mapData.bossSpawn
+    ? {
+        x: (mapData.bossSpawn.tileX + 0.5) * TILE_SIZE,
+        y: (mapData.bossSpawn.tileY + 0.5) * TILE_SIZE,
+      }
+    : null;
+
   return {
     map,
     groundLayer,
@@ -47,5 +54,6 @@ export const loadMap = (scene, mapId) => {
       x: (spawn.tileX + 0.5) * TILE_SIZE,
       y: (spawn.tileY + 0.5) * TILE_SIZE,
     })),
+    bossSpawnPoint,
   };
 };

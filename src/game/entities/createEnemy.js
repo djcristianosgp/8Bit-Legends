@@ -1,7 +1,13 @@
 import { createCombatStats } from '../combat/stats';
 import { createEnemyAiState } from '../ai/enemyBehavior';
 
-export const createEnemy = (scene, x, y) => {
+/**
+ * @param {Phaser.Scene} scene
+ * @param {number} x
+ * @param {number} y
+ * @param {number} [difficultyFactor=1] - multiplicador de dificuldade da fase
+ */
+export const createEnemy = (scene, x, y, difficultyFactor = 1) => {
   const enemy = scene.physics.add.sprite(x, y, 'player', 0);
   enemy.setScale(2);
   enemy.setTint(0xff8080);
@@ -13,10 +19,12 @@ export const createEnemy = (scene, x, y) => {
   body.setOffset(11, 17);
   body.setMaxVelocity(140, 140);
 
+  enemy.isBoss = false;
+
   enemy.stats = createCombatStats({
-    maxHealth: 45,
-    attack: 11,
-    defense: 2,
+    maxHealth: Math.round(45 * difficultyFactor),
+    attack: Math.round(11 * difficultyFactor),
+    defense: Math.round(2 * difficultyFactor),
   });
 
   enemy.ai = createEnemyAiState(scene.time.now);

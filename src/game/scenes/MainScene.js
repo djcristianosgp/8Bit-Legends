@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 import { createPlayer } from '../entities/createPlayer';
 import { createPlayerAnimations, PLAYER_ANIMS } from '../animations/playerAnimations';
-import { DEFAULT_MAP_ID } from '../maps/mapRegistry';
 import { loadMap } from '../maps/loadMap';
 import { createEnemy } from '../entities/createEnemy';
+import { createBoss } from '../entities/createBoss';
 import { updateEnemyBehavior } from '../ai/enemyBehavior';
+import { updateBossBehavior } from '../ai/bossBehavior';
 import { attachEnemyHealthBar, createPlayerHealthBar } from '../combat/healthBars';
 import { performPlayerAttack, processContactDamage } from '../combat/combatSystem';
 import { getAttackValue, getMoveSpeed, isDead } from '../combat/stats';
@@ -12,6 +13,10 @@ import { createInventory, addItemToInventory } from '../items/inventory';
 import { ITEM_CONFIG, rollEnemyDrop } from '../items/itemDefinitions';
 import { applyItemEffect } from '../items/itemEffects';
 import { createDropGroup, showCollectFeedback, spawnItemDrop } from '../items/dropSystem';
+import { getPhaseConfig, getDifficultyFactor, TOTAL_PHASES } from '../phases/phaseConfig';
+import { OVERLAY_SCENE_KEY } from './OverlayScene';
+import { serializeScene } from '../save/saveSerializer';
+import { writeToStorage } from '../save/saveStorage';
 
 const PLAYER_SPEED = 180;
 const PLAYER_ATTACK_COOLDOWN = 280;
@@ -32,6 +37,35 @@ export class MainScene extends Phaser.Scene {
     this.inventory = null;
     this.inventoryText = null;
     this.currentMapId = null;
+    /** Fase atual (1-10). Definida em init() antes de create(). */
+    this.startPhase = 1;
+    /** true enquanto o overlay de vitória/derrota está ativo */
+    this.phaseClear = false;
+    this.phaseText = null;
+  }
+
+  /**
+   * Phaser chama init() antes de create(). Usa o phase passado pelo OverlayScene
+   * ou, na primeira carga, lê do localStorage para restaurar o progresso.
+   */
+  init(data) {
+    if (data?.phase != null) {
+      this.startPhase = Math.max(1, Math.min(TOTAL_PHASES, Number(data.phase) || 1));
+      return;
+    }
+
+    // Primeira carga: tenta restaurar fase salva
+    try {
+      const raw = localStorage.getItem('8bitlegends_save');
+      const saved = raw ? JSON.parse(raw) : null;
+      const savedPhase = saved?.phase;
+      this.startPhase =
+        Number.isInteger(savedPhase) && savedPhase >= 1 && savedPhase <= TOTAL_PHASES
+          ? savedPhase
+          : 1;
+    } catch {
+      this.startPhase = 1;
+    }
   }
 
   preload() {
@@ -44,7 +78,12 @@ export class MainScene extends Phaser.Scene {
   }
 
   create() {
-    this.currentMapId = DEFAULT_MAP_ID;
+    const phaseConfig = getPhaseConfig(this.startPhase);
+    const diffFactor = getDifficultyFactor(this.startPhase);
+
+    this.phaseClear = false;
+    this.currentMapId = phaseConfig.mapId;
+
     const mapState = loadMap(this, this.currentMapId);
     this.worldSize = mapState.worldSize;
 
@@ -54,6 +93,7 @@ export class MainScene extends Phaser.Scene {
     this.physics.add.collider(this.player, mapState.wallLayer);
     this.playerHealthBar = createPlayerHealthBar(this, this.player.stats);
 
+    // ── HUD: inventário ────────────────────────────────────────────────────
     this.inventory = createInventory();
     this.inventoryText = this.add
       .text(14, 34, '', {
@@ -67,25 +107,57 @@ export class MainScene extends Phaser.Scene {
       .setDepth(31);
     this.updateInventoryHud();
 
+    // ── HUD: fase ──────────────────────────────────────────────────────────
+    this.phaseText = this.add
+      .text(this.scale.width - 14, 10, '', {
+        fontFamily: 'Trebuchet MS, sans-serif',
+        fontSize: '14px',
+        color: '#f4c25b',
+        stroke: '#1b1f2d',
+        strokeThickness: 4,
+      })
+      .setScrollFactor(0)
+      .setDepth(31)
+      .setOrigin(1, 0);
+    this.updatePhaseHud();
+
+    // ── Drops ──────────────────────────────────────────────────────────────
     this.itemDrops = createDropGroup(this);
     this.physics.add.overlap(this.player, this.itemDrops, this.onPlayerCollectDrop, null, this);
 
+    // ── Inimigos ───────────────────────────────────────────────────────────
     this.enemies = this.physics.add.group();
-    mapState.enemySpawnPoints.forEach((spawn) => {
-      const enemy = createEnemy(this, spawn.x, spawn.y);
+
+    const enemySpawns = mapState.enemySpawnPoints.slice(0, phaseConfig.enemyCount);
+    enemySpawns.forEach((spawn) => {
+      const enemy = createEnemy(this, spawn.x, spawn.y, diffFactor);
       attachEnemyHealthBar(this, enemy);
       this.enemies.add(enemy);
     });
+
+    // ── Boss (apenas em fases pares) ───────────────────────────────────────
+    if (phaseConfig.isBoss && mapState.bossSpawnPoint) {
+      const boss = createBoss(
+        this,
+        mapState.bossSpawnPoint.x,
+        mapState.bossSpawnPoint.y,
+        diffFactor,
+      );
+      attachEnemyHealthBar(this, boss);
+      this.enemies.add(boss);
+    }
 
     this.physics.add.collider(this.enemies, mapState.wallLayer);
     this.physics.add.collider(this.enemies, this.enemies);
     this.physics.add.overlap(this.player, this.enemies, this.onPlayerEnemyOverlap, null, this);
 
+    // ── Câmera ─────────────────────────────────────────────────────────────
     const camera = this.cameras.main;
     camera.setBounds(0, 0, this.worldSize.width, this.worldSize.height);
     camera.startFollow(this.player, true, 0.15, 0.15);
     camera.roundPixels = true;
 
+    // ── Controles ──────────────────────────────────────────────────────────
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
@@ -95,14 +167,17 @@ export class MainScene extends Phaser.Scene {
     });
     this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
+    // ── Ciclo de vida ──────────────────────────────────────────────────────
     this.scale.on('resize', this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off('resize', this.handleResize, this);
       this.playerHealthBar?.destroy();
-      this.enemies?.children.iterate((enemy) => enemy?.healthBar?.destroy());
+      this.enemies?.children.iterate((e) => e?.healthBar?.destroy());
       this.inventoryText?.destroy();
+      this.phaseText?.destroy();
     });
 
+    // Auto-save a cada 30s (só quando o player está vivo)
     this.time.addEvent({
       delay: 30_000,
       loop: true,
@@ -117,7 +192,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   update(time) {
-    if (!this.player) {
+    if (!this.player || this.phaseClear) {
       return;
     }
 
@@ -161,13 +236,18 @@ export class MainScene extends Phaser.Scene {
       return;
     }
 
-    this.enemies.children.iterate((enemy) => {
-      if (!enemy || !enemy.active) {
+    this.enemies.children.iterate((entity) => {
+      if (!entity || !entity.active) {
         return;
       }
 
-      updateEnemyBehavior(enemy, this.player, time);
-      enemy.healthBar?.update();
+      if (entity.isBoss) {
+        updateBossBehavior(entity, this.player, time, this);
+      } else {
+        updateEnemyBehavior(entity, this.player, time);
+      }
+
+      entity.healthBar?.update();
     });
   }
 
@@ -193,6 +273,9 @@ export class MainScene extends Phaser.Scene {
         if (dropType) {
           spawnItemDrop(this, this.itemDrops, dropType, enemy.x, enemy.y);
         }
+
+        // Verifica limpeza da fase após a iteração acabar
+        this.time.delayedCall(50, () => this.checkPhaseClear());
       },
     });
   }
@@ -221,6 +304,51 @@ export class MainScene extends Phaser.Scene {
     drop.destroy();
   }
 
+  /**
+   * Verifica se todos os inimigos (incluindo boss) foram eliminados.
+   * Se sim, salva o progresso, congela a cena e lança o overlay de vitória.
+   */
+  checkPhaseClear() {
+    if (this.phaseClear) return;
+    if (!this.enemies || this.enemies.countActive(true) > 0) return;
+
+    this.phaseClear = true;
+
+    if (this.player?.body) {
+      this.player.body.setVelocity(0, 0);
+    }
+
+    const isFinal = this.startPhase >= TOTAL_PHASES;
+
+    // Salva com a fase seguinte para que o próximo load comece no lugar certo
+    try {
+      const saveData = serializeScene(this);
+      saveData.phase = isFinal ? 1 : this.startPhase + 1;
+      writeToStorage(saveData);
+    } catch {
+      // Falha silenciosa; o save manual ainda está disponível
+    }
+
+    this.time.delayedCall(700, () => {
+      this.scene.launch(OVERLAY_SCENE_KEY, {
+        type: isFinal ? 'gameover' : 'victory',
+        phase: this.startPhase,
+        nextPhase: this.startPhase + 1,
+      });
+    });
+  }
+
+  updatePhaseHud() {
+    if (!this.phaseText) return;
+
+    const config = getPhaseConfig(this.startPhase);
+    const bossTag = config.isBoss ? '  ☠ BOSS' : '';
+    this.phaseText.setText(`Fase ${this.startPhase} / ${TOTAL_PHASES}${bossTag}`);
+
+    // Tint especial em fases de boss
+    this.phaseText.setColor(config.isBoss ? '#ff7070' : '#f4c25b');
+  }
+
   updateInventoryHud() {
     if (!this.inventoryText || !this.player) {
       return;
@@ -238,11 +366,15 @@ export class MainScene extends Phaser.Scene {
   }
 
   onPlayerEnemyOverlap(player, enemy) {
+    // Stomp do boss encurta o cooldown de contato (ataque mais rápido)
+    const isStomping = enemy.isBoss && enemy.ai?.bossMode === 'stomp';
+    const cooldownMs = isStomping ? 300 : 850;
+
     const didTakeDamage = processContactDamage({
       player,
       enemy,
       now: this.time.now,
-      cooldownMs: 850,
+      cooldownMs,
     });
 
     if (didTakeDamage) {
@@ -251,7 +383,11 @@ export class MainScene extends Phaser.Scene {
 
     if (isDead(player.stats)) {
       player.body.setVelocity(0, 0);
-      this.scene.restart();
+      this.phaseClear = true; // congela o update loop
+
+      this.time.delayedCall(450, () => {
+        this.scene.launch(OVERLAY_SCENE_KEY, { type: 'defeat', phase: this.startPhase });
+      });
     }
   }
 
@@ -286,6 +422,18 @@ export class MainScene extends Phaser.Scene {
   applySave(data) {
     const safeNum = (v, min, max) => Math.min(Math.max(Number(v) || 0, min), max);
     const VALID_FACINGS = ['down', 'up', 'left', 'right'];
+
+    // Se a fase salva for diferente da atual, reinicia na fase correta.
+    // Isso garante que "Importar save" troque de fase corretamente.
+    const savedPhase =
+      Number.isInteger(data.phase) && data.phase >= 1 && data.phase <= TOTAL_PHASES
+        ? data.phase
+        : 1;
+
+    if (savedPhase !== this.startPhase) {
+      this.scene.restart({ phase: savedPhase });
+      return;
+    }
 
     const maxHp = safeNum(data.player.stats.maxHealth, 1, 9999);
     this.player.stats.maxHealth = maxHp;

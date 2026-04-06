@@ -2,6 +2,8 @@ const PLAYER_BAR_WIDTH = 180;
 const PLAYER_BAR_HEIGHT = 18;
 const ENEMY_BAR_WIDTH = 28;
 const ENEMY_BAR_HEIGHT = 5;
+const BOSS_BAR_WIDTH = 62;
+const BOSS_BAR_HEIGHT = 8;
 
 const drawBar = (graphics, x, y, width, height, percent, colors) => {
   graphics.clear();
@@ -46,6 +48,10 @@ export const createPlayerHealthBar = (scene, stats) => {
 
 export const attachEnemyHealthBar = (scene, enemy) => {
   const graphics = scene.add.graphics().setDepth(6);
+  const isBoss = enemy.isBoss === true;
+  const barW = isBoss ? BOSS_BAR_WIDTH : ENEMY_BAR_WIDTH;
+  const barH = isBoss ? BOSS_BAR_HEIGHT : ENEMY_BAR_HEIGHT;
+  const yOffset = isBoss ? -52 : -30;
 
   const update = () => {
     if (!enemy.active) {
@@ -54,13 +60,13 @@ export const attachEnemyHealthBar = (scene, enemy) => {
     }
 
     const percent = enemy.stats.health / enemy.stats.maxHealth;
-    const x = enemy.x - ENEMY_BAR_WIDTH / 2;
-    const y = enemy.y - 30;
+    const x = enemy.x - barW / 2;
+    const y = enemy.y + yOffset;
 
-    drawBar(graphics, x, y, ENEMY_BAR_WIDTH, ENEMY_BAR_HEIGHT, percent, {
+    drawBar(graphics, x, y, barW, barH, percent, {
       background: 0x1f1f27,
-      fill: 0xde5f5f,
-      border: 0x22222a,
+      fill: isBoss ? 0xff3333 : 0xde5f5f,
+      border: isBoss ? 0x880000 : 0x22222a,
     });
   };
 
