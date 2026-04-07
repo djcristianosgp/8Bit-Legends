@@ -27,6 +27,9 @@ export class WeatherSystem {
     this.rainGraphics = null;
     this.raindrops = [];
     this.reducedEffects = Boolean(scene.registry.get('deviceProfile')?.reducedEffects);
+    this.rainDrawIntervalMs = this.reducedEffects ? 66 : 40;
+    this.lastRainDrawAt = 0;
+    this.rainStepSeconds = 0;
     this._handleResize = (gameSize) => this.layout(gameSize.width, gameSize.height);
   }
 
@@ -87,12 +90,20 @@ export class WeatherSystem {
     const width = this.scene.scale.width;
     const height = this.scene.scale.height;
 
+    if (time - this.lastRainDrawAt < this.rainDrawIntervalMs) {
+      return;
+    }
+
+    const deltaMs = this.lastRainDrawAt > 0 ? time - this.lastRainDrawAt : this.rainDrawIntervalMs;
+    this.lastRainDrawAt = time;
+    this.rainStepSeconds = Math.min(0.08, deltaMs / 1000);
+
     this.rainGraphics.clear();
     this.rainGraphics.lineStyle(1, 0x9fdcff, this.reducedEffects ? 0.22 : 0.35);
 
     this.raindrops.forEach((drop) => {
-      drop.y += drop.speed * 0.016;
-      drop.x -= drop.speed * 0.005;
+      drop.y += drop.speed * this.rainStepSeconds;
+      drop.x -= drop.speed * this.rainStepSeconds * 0.3125;
 
       if (drop.y > height + 16 || drop.x < -16) {
         drop.x = Phaser.Math.Between(0, width + 20);

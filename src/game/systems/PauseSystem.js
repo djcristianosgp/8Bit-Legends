@@ -22,11 +22,11 @@ export class PauseSystem {
 
   create() {
     this.pauseKey = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    const showMapPauseButton = !this.scene.deviceProfile?.isMobile;
 
     const bg = this.scene.add
       .rectangle(0, 0, 96, 28, 0x112443, 0.92)
-      .setStrokeStyle(2, 0xe7b95a, 1)
-      .setInteractive({ useHandCursor: true });
+      .setStrokeStyle(2, 0xe7b95a, 1);
 
     const label = this.scene.add
       .text(0, 0, '⏸ PAUSA', {
@@ -39,7 +39,14 @@ export class PauseSystem {
       .setOrigin(0.5);
 
     this.pauseButton = this.scene.add.container(0, 0, [bg, label]).setDepth(72).setScrollFactor(0);
-    bg.on('pointerdown', () => this.togglePause());
+
+    if (showMapPauseButton) {
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerdown', () => this.togglePause());
+    } else {
+      this.pauseButton.setVisible(false);
+      this.pauseButton.setActive(false);
+    }
 
     const dim = this.scene.add
       .rectangle(0, 0, 10, 10, 0x02050a, 0.74)

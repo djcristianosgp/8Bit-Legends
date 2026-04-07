@@ -160,6 +160,7 @@ export class MainScene extends Phaser.Scene {
   create() {
     const phaseConfig = getPhaseConfig(this.startPhase);
     const diffFactor = getDifficultyFactor(this.startPhase);
+    const showMapHud = !this.deviceProfile?.isMobile;
 
     this.phaseClear = false;
     this.currentMapId = phaseConfig.mapId;
@@ -198,54 +199,58 @@ export class MainScene extends Phaser.Scene {
 
     // ── HUD: inventário ────────────────────────────────────────────────────
     this.inventory = createInventory();
-    this.inventoryText = this.add
-      .text(22, 92, '', {
-        fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '11px',
-        color: '#f2e7cc',
-        stroke: '#171b27',
-        strokeThickness: 3,
-        lineSpacing: 2,
-      })
-      .setScrollFactor(0)
-      .setDepth(31);
-    this.updateInventoryHud();
+    if (showMapHud) {
+      this.inventoryText = this.add
+        .text(22, 92, '', {
+          fontFamily: 'Trebuchet MS, sans-serif',
+          fontSize: '11px',
+          color: '#f2e7cc',
+          stroke: '#171b27',
+          strokeThickness: 3,
+          lineSpacing: 2,
+        })
+        .setScrollFactor(0)
+        .setDepth(31);
+      this.updateInventoryHud();
+    }
 
     // ── HUD: fase ──────────────────────────────────────────────────────────
-    this.phaseText = this.add
-      .text(this.scale.width - 14, 10, '', {
-        fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '13px',
-        color: '#f0c46b',
-        stroke: '#171b27',
-        strokeThickness: 4,
-      })
-      .setScrollFactor(0)
-      .setDepth(31)
-      .setOrigin(1, 0);
-    this.updatePhaseHud();
+    if (showMapHud) {
+      this.phaseText = this.add
+        .text(this.scale.width - 14, 10, '', {
+          fontFamily: 'Trebuchet MS, sans-serif',
+          fontSize: '13px',
+          color: '#f0c46b',
+          stroke: '#171b27',
+          strokeThickness: 4,
+        })
+        .setScrollFactor(0)
+        .setDepth(31)
+        .setOrigin(1, 0);
+      this.updatePhaseHud();
 
-    this.playerNameText = this.add
-      .text(22, 58, `Nome ${this.playerName}`, {
-        fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '11px',
-        color: '#a8d7ff',
-        stroke: '#171b27',
-        strokeThickness: 3,
-      })
-      .setScrollFactor(0)
-      .setDepth(31);
+      this.playerNameText = this.add
+        .text(22, 58, `Nome ${this.playerName}`, {
+          fontFamily: 'Trebuchet MS, sans-serif',
+          fontSize: '11px',
+          color: '#a8d7ff',
+          stroke: '#171b27',
+          strokeThickness: 3,
+        })
+        .setScrollFactor(0)
+        .setDepth(31);
 
-    this.statusText = this.add
-      .text(22, 74, 'Status Explorando', {
-        fontFamily: 'Trebuchet MS, sans-serif',
-        fontSize: '11px',
-        color: '#bde5b8',
-        stroke: '#171b27',
-        strokeThickness: 3,
-      })
-      .setScrollFactor(0)
-      .setDepth(31);
+      this.statusText = this.add
+        .text(22, 74, 'Status Explorando', {
+          fontFamily: 'Trebuchet MS, sans-serif',
+          fontSize: '11px',
+          color: '#bde5b8',
+          stroke: '#171b27',
+          strokeThickness: 3,
+        })
+        .setScrollFactor(0)
+        .setDepth(31);
+    }
 
     // ── Drops ──────────────────────────────────────────────────────────────
     this.itemDrops = createDropGroup(this);
@@ -305,12 +310,14 @@ export class MainScene extends Phaser.Scene {
     });
     this.skillSystem.create(this.player, this.enemies);
 
-    this.minimapSystem = new MinimapSystem(this);
-    this.minimapSystem.create({
-      player: this.player,
-      enemies: this.enemies,
-      worldSize: this.worldSize,
-    });
+    if (showMapHud) {
+      this.minimapSystem = new MinimapSystem(this);
+      this.minimapSystem.create({
+        player: this.player,
+        enemies: this.enemies,
+        worldSize: this.worldSize,
+      });
+    }
 
     this.pauseSystem = new PauseSystem(this, {
       onRestartPhase: () => this.restartCurrentPhase(),
