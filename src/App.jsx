@@ -23,11 +23,18 @@ function App() {
   const socketSyncRef = useRef(null);
   const fileInputRef = useRef(null);
   const toastTimeoutRef = useRef(null);
+  const touchGestureRef = useRef({
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+  });
 
   const [started, setStarted] = useState(() => localStorage.getItem('8bl_autostart') === '1');
   const [playerName, setPlayerName] = useState(() => localStorage.getItem('8bl_player_name') ?? 'Heroi');
   const [toast, setToast] = useState(null);
   const [installPrompt, setInstallPrompt] = useState(null);
+  const [showUtilityPanel, setShowUtilityPanel] = useState(false);
   const [showTouchControls, setShowTouchControls] = useState(
     () => localStorage.getItem('8bl_touch_controls') !== '0',
   );
@@ -104,6 +111,12 @@ function App() {
   useEffect(() => {
     localStorage.setItem('8bl_touch_controls', showTouchControls ? '1' : '0');
   }, [showTouchControls]);
+
+  useEffect(() => {
+    if (!isMobileViewport || !started) {
+      setShowUtilityPanel(false);
+    }
+  }, [isMobileViewport, started]);
 
   useEffect(() => {
     const onPwaStatus = (event) => {
@@ -190,6 +203,13 @@ function App() {
     }
 
     const persistAndPause = () => {
+      touchGestureRef.current = {
+        active: false,
+        pointerId: null,
+        startX: 0,
+        startY: 0,
+      };
+      clearTouchMovement();
       saveBridgeRef.current?.save();
       gameRef.current?.events.emit('force-pause');
       gameRef.current?.loop?.sleep?.();
@@ -238,6 +258,93 @@ function App() {
       pulseHaptics(14);
     }
   }, [pulseHaptics]);
+
+  const clearTouchMovement = useCallback(() => {
+    setMobileInput((prev) => {
+      if (!prev.up && !prev.down && !prev.left && !prev.right) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+      };
+    });
+  }, []);
+
+  const updateTouchMovement = useCallback((deltaX, deltaY) => {
+    const threshold = 14;
+
+    setMobileInput((prev) => {
+      const next = {
+        ...prev,
+        left: deltaX < -threshold,
+        right: deltaX > threshold,
+        up: deltaY < -threshold,
+        down: deltaY > threshold,
+      };
+
+      if (
+        next.up === prev.up &&
+        next.down === prev.down &&
+        next.left === prev.left &&
+        next.right === prev.right
+      ) {
+        return prev;
+      }
+
+      return next;
+    });
+  }, []);
+
+  const handleGameTouchStart = useCallback((event) => {
+    if (!started || !isMobileViewport) {
+      return;
+    }
+
+    event.preventDefault();
+    touchGestureRef.current = {
+      active: true,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }, [isMobileViewport, started]);
+
+  const handleGameTouchMove = useCallback((event) => {
+    const gesture = touchGestureRef.current;
+    if (!gesture.active || gesture.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    updateTouchMovement(event.clientX - gesture.startX, event.clientY - gesture.startY);
+  }, [updateTouchMovement]);
+
+  const handleGameTouchEnd = useCallback((event) => {
+    const gesture = touchGestureRef.current;
+    if (!gesture.active) {
+      return;
+    }
+
+    if (event?.pointerId != null && gesture.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event?.currentTarget?.releasePointerCapture?.(event.pointerId);
+    touchGestureRef.current = {
+      active: false,
+      pointerId: null,
+      startX: 0,
+      startY: 0,
+    };
+    clearTouchMovement();
+  }, [clearTouchMovement]);
 
   const getControlBindings = (key) => ({
     onPointerDown: () => setMobileControl(key, true),
@@ -304,21 +411,24 @@ function App() {
     }
   };
 
-  const shouldShowTouchControls = started && isMobileViewport && showTouchControls;
+  const isCompactMobileLayout = started && isMobileViewport;
+  const shouldShowTouchControls = isCompactMobileLayout && showTouchControls;
 
   return (
-    <main className="app-shell">
-      <header className="game-header">
+    <main className={`app-shell ${isCompactMobileLayout ? 'app-shell--mobile-compact' : ''}`}>
+      <header className={`game-header ${isCompactMobileLayout ? 'game-header--compact' : ''}`}>
         <div>
           <h1>8Bit Legends</h1>
           <p>
-            {isMobileViewport
-              ? 'Toque para mover, atacar, usar skills e pausar.'
-              : 'Mova com setas/WASD · Ataque: ESPAÇO · Skills: 1/2/3 · Escudo: SHIFT · Pausa: ESC'}
+            {isCompactMobileLayout
+              ? 'Arraste para mover e use os botões de ação.'
+              : isMobileViewport
+                ? 'Arraste o dedo na área do jogo para mover e use os botões para atacar, skills e pausar.'
+                : 'Mova com setas/WASD · Ataque: ESPAÇO · Skills: 1/2/3 · Escudo: SHIFT · Pausa: ESC'}
           </p>
         </div>
         <div className="header-actions">
-          {isMobileViewport && started && (
+          {!isCompactMobileLayout && isMobileViewport && started && (
             <button
               className="save-btn header-action-btn"
               type="button"
@@ -327,7 +437,7 @@ function App() {
               {showTouchControls ? 'Ocultar touch' : 'Mostrar touch'}
             </button>
           )}
-          {installPrompt && !isStandalone && (
+          {installPrompt && !isStandalone && !isCompactMobileLayout && (
             <button className="save-btn header-action-btn" type="button" onClick={handleInstallApp}>
               📲 Instalar app
             </button>
@@ -359,47 +469,67 @@ function App() {
       )}
 
       {started && (
-        <section className="hud-panel" aria-label="HUD externo">
-          <div className="hud-main">
+        <section className={`hud-panel ${isCompactMobileLayout ? 'hud-panel--compact' : ''}`} aria-label="HUD externo">
+          <div className={`hud-main ${isCompactMobileLayout ? 'hud-main--compact' : ''}`}>
             <strong className="hud-name">{hud.playerName}</strong>
-            <span className="hud-chip">Fase {hud.phase}</span>
+            <span className="hud-chip">{isCompactMobileLayout ? `F${hud.phase}` : `Fase ${hud.phase}`}</span>
             <span className={`hud-chip ${hud.enemyCount <= 3 && hud.enemyTotal > 0 ? 'hud-chip--warn' : ''}`}>
               👾 {hud.enemyCount}/{hud.enemyTotal || hud.enemyCount}
             </span>
-            <span className="hud-chip">Clima: {hud.weatherLabel}</span>
-            <span className={`hud-chip ${hud.paused ? 'hud-chip--pause' : ''}`}>Status: {hud.status}</span>
-            <span className="hud-chip">⚔ {hud.weaponLabel}</span>
-            {isStandalone && <span className="hud-chip">App instalado</span>}
+            <span className="hud-chip">{isCompactMobileLayout ? `☁ ${hud.weatherLabel}` : `Clima: ${hud.weatherLabel}`}</span>
+            <span className={`hud-chip ${hud.paused ? 'hud-chip--pause' : ''}`}>
+              {isCompactMobileLayout ? `${hud.paused ? '⏸' : '▶'} ${hud.status}` : `Status: ${hud.status}`}
+            </span>
+            {!isCompactMobileLayout && <span className="hud-chip">⚔ {hud.weaponLabel}</span>}
+            {isStandalone && !isCompactMobileLayout && <span className="hud-chip">App instalado</span>}
           </div>
           <div className="hud-life" aria-label="Vida do jogador">
-            <span>Vida {hud.hp}/{hud.maxHp}</span>
+            <span>{isCompactMobileLayout ? `HP ${hud.hp}/${hud.maxHp}` : `Vida ${hud.hp}/${hud.maxHp}`}</span>
             <div className="hud-life-bar">
               <div className="hud-life-fill" style={{ width: `${hpPercent}%` }} />
             </div>
           </div>
-          <div className="hud-skill-row" aria-label="Skills e cooldowns">
+          <div className={`hud-skill-row ${isCompactMobileLayout ? 'hud-skill-row--compact' : ''}`} aria-label="Skills e cooldowns">
             <span className={`hud-skill ${hud.skills.fireball === 'OK' ? 'hud-skill--ready' : 'hud-skill--cooldown'}`}>
-              1 Fireball {hud.skills.fireball}
+              {isCompactMobileLayout ? `1 ${hud.skills.fireball}` : `1 Fireball ${hud.skills.fireball}`}
             </span>
             <span className={`hud-skill ${hud.skills.lightning === 'OK' ? 'hud-skill--ready' : 'hud-skill--cooldown'}`}>
-              2 Lightning {hud.skills.lightning}
+              {isCompactMobileLayout ? `2 ${hud.skills.lightning}` : `2 Lightning ${hud.skills.lightning}`}
             </span>
             <span className={`hud-skill ${hud.skills.aura === 'OK' ? 'hud-skill--ready' : 'hud-skill--cooldown'}`}>
-              3 Aura {hud.skills.aura}
+              {isCompactMobileLayout ? `3 ${hud.skills.aura}` : `3 Aura ${hud.skills.aura}`}
             </span>
-            <span className="hud-skill">Aura ativa: {hud.skills.auraActive}</span>
+            <span className="hud-skill">{isCompactMobileLayout ? `Aura ${hud.skills.auraActive}` : `Aura ativa: ${hud.skills.auraActive}`}</span>
           </div>
-          <div className="hud-actions">
+          <div className={`hud-actions ${isCompactMobileLayout ? 'hud-actions--compact' : ''}`}>
             <button className="save-btn hud-action-btn" type="button" onClick={handlePauseToggle}>
               {hud.paused ? '▶ Continuar' : '⏸ Pausar'}
             </button>
+            {isCompactMobileLayout && (
+              <button className="save-btn hud-action-btn" type="button" onClick={handleSave}>
+                💾 Salvar
+              </button>
+            )}
           </div>
         </section>
       )}
 
       <section className={`game-wrapper ${isMobileViewport ? 'game-wrapper--mobile' : ''}`}>
-        <div ref={containerRef} className="game-container" />
+        <div
+          ref={containerRef}
+          className={`game-container ${isMobileViewport ? 'game-container--touch' : ''}`}
+          aria-label={isMobileViewport ? 'Área do jogo com movimento por toque' : 'Área do jogo'}
+          onPointerDown={handleGameTouchStart}
+          onPointerMove={handleGameTouchMove}
+          onPointerUp={handleGameTouchEnd}
+          onPointerCancel={handleGameTouchEnd}
+          onLostPointerCapture={handleGameTouchEnd}
+        />
       </section>
+
+      {started && isMobileViewport && (
+        <p className="touch-drag-hint">👆 Arraste o dedo sobre a área do jogo para movimentar o personagem.</p>
+      )}
 
       {shouldShowTouchControls && (
         <section className="mobile-controls" aria-label="Controles mobile">
@@ -484,26 +614,61 @@ function App() {
         </section>
       )}
 
-      <footer className="save-controls">
+      <footer className={`save-controls ${isCompactMobileLayout ? 'save-controls--compact' : ''}`}>
         {toast && (
           <span className={`save-toast ${toast.ok ? 'save-toast--ok' : 'save-toast--err'}`}>
             {toast.msg}
           </span>
         )}
-        <button className="save-btn" type="button" onClick={handleSave}>
-          Salvar
-        </button>
-        <button className="save-btn" type="button" onClick={handleExport}>
-          Exportar JSON
-        </button>
-        <button className="save-btn" type="button" onClick={handleImportClick}>
-          Importar JSON
-        </button>
-        {installPrompt && !isStandalone && (
-          <button className="save-btn" type="button" onClick={handleInstallApp}>
-            Instalar App
-          </button>
+
+        {isCompactMobileLayout ? (
+          <>
+            <button
+              className="save-btn save-btn--compact-toggle"
+              type="button"
+              onClick={() => setShowUtilityPanel((prev) => !prev)}
+            >
+              {showUtilityPanel ? 'Fechar utilidades' : '☰ Mais opções'}
+            </button>
+
+            {showUtilityPanel && (
+              <div className="mobile-utility-panel">
+                <button className="save-btn" type="button" onClick={() => setShowTouchControls((prev) => !prev)}>
+                  {showTouchControls ? 'Ocultar touch' : 'Mostrar touch'}
+                </button>
+                <button className="save-btn" type="button" onClick={handleExport}>
+                  Exportar JSON
+                </button>
+                <button className="save-btn" type="button" onClick={handleImportClick}>
+                  Importar JSON
+                </button>
+                {installPrompt && !isStandalone && (
+                  <button className="save-btn" type="button" onClick={handleInstallApp}>
+                    Instalar App
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <button className="save-btn" type="button" onClick={handleSave}>
+              Salvar
+            </button>
+            <button className="save-btn" type="button" onClick={handleExport}>
+              Exportar JSON
+            </button>
+            <button className="save-btn" type="button" onClick={handleImportClick}>
+              Importar JSON
+            </button>
+            {installPrompt && !isStandalone && (
+              <button className="save-btn" type="button" onClick={handleInstallApp}>
+                Instalar App
+              </button>
+            )}
+          </>
         )}
+
         <input
           ref={fileInputRef}
           type="file"

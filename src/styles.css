@@ -249,6 +249,16 @@ button {
 .hud-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.hud-actions--compact {
+  justify-content: stretch;
+}
+
+.hud-actions--compact .hud-action-btn {
+  flex: 1 1 48%;
+  min-width: 0;
 }
 
 .hud-action-btn {
@@ -274,6 +284,20 @@ button {
     0 14px 30px rgb(0 0 0 / 40%);
 }
 
+.game-container--touch {
+  touch-action: none;
+  user-select: none;
+}
+
+.touch-drag-hint {
+  width: min(1000px, 96vw);
+  margin: -0.25rem auto 0;
+  text-align: center;
+  font-size: 0.78rem;
+  color: #bfd0e9;
+  opacity: 0.94;
+}
+
 canvas {
   display: block;
   width: 100% !important;
@@ -289,6 +313,25 @@ canvas {
   gap: 0.65rem;
   padding: 0.3rem 0.6rem 0.5rem;
   flex-wrap: wrap;
+}
+
+.save-controls--compact {
+  width: min(1000px, 96vw);
+  margin: 0 auto;
+  gap: 0.4rem;
+  padding-top: 0;
+}
+
+.mobile-utility-panel {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.mobile-utility-panel .save-btn,
+.save-btn--compact-toggle {
+  flex: 1 1 40%;
 }
 
 .save-btn {
@@ -429,56 +472,128 @@ canvas {
     gap: 0.65rem;
   }
 
+  .app-shell--mobile-compact {
+    gap: 0.45rem;
+    padding-top: 0.45rem;
+  }
+
   .game-header {
     flex-direction: column;
     align-items: stretch;
     text-align: center;
   }
 
+  .game-header--compact h1 {
+    font-size: 1.35rem;
+  }
+
+  .game-header--compact p {
+    margin-top: 0.12rem;
+    font-size: 0.72rem;
+  }
+
   .header-actions {
     justify-content: center;
   }
 
+  .hud-panel--compact {
+    padding: 0.5rem 0.55rem;
+    gap: 0.35rem;
+  }
+
+  .hud-main--compact {
+    gap: 0.35rem;
+    font-size: 0.74rem;
+  }
+
+  .hud-skill-row--compact {
+    gap: 0.3rem;
+  }
+
+  .hud-skill-row--compact .hud-skill {
+    font-size: 0.66rem;
+    padding: 0.12rem 0.34rem;
+  }
+
+  .game-wrapper {
+    min-height: 0;
+  }
+
+  .game-container {
+    width: min(100%, 94vw);
+    aspect-ratio: 4 / 3;
+    min-height: clamp(180px, 29dvh, 230px);
+    max-height: 31dvh;
+  }
+
+  .touch-drag-hint {
+    margin-top: -0.15rem;
+    font-size: 0.7rem;
+  }
+
   .mobile-controls {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    gap: 0.5rem;
+  }
+
+  .mobile-controls__left,
+  .mobile-controls__right {
+    padding: 0.45rem;
+    gap: 0.35rem;
+  }
+
+  .mobile-pad {
+    width: 100%;
+    max-width: 148px;
+    margin: 0 auto;
+    grid-template-columns: repeat(3, minmax(40px, 1fr));
+    grid-template-rows: repeat(3, 44px);
+  }
+
+  .mobile-action-grid {
+    gap: 0.35rem;
+  }
+
+  .mobile-action {
+    min-height: 44px;
+    padding: 0.35rem;
+    font-size: 0.75rem;
+  }
+
+  .mobile-action--attack {
+    min-height: 50px;
   }
 }
 
 @media (max-width: 700px) {
   .app-shell {
     grid-template-rows: auto auto auto 1fr auto auto;
-    gap: 0.55rem;
-    padding: 0.55rem;
-    padding-bottom: calc(0.7rem + env(safe-area-inset-bottom, 0px));
+    gap: 0.5rem;
+    padding: 0.5rem;
+    padding-bottom: calc(0.65rem + env(safe-area-inset-bottom, 0px));
   }
 
   .game-container {
-    min-height: 240px;
+    min-height: 170px;
+    max-height: 28dvh;
     border-width: 3px;
   }
 
   .game-header h1 {
-    font-size: 1.45rem;
+    font-size: 1.3rem;
   }
 
   .game-header p {
-    font-size: 0.82rem;
+    font-size: 0.76rem;
   }
 
   .hud-panel {
-    padding: 0.6rem;
-  }
-
-  .mobile-controls {
-    flex-direction: column;
+    padding: 0.5rem;
   }
 
   .mobile-controls__left,
   .mobile-controls__right {
-    width: 100%;
-  }
-
-  .mobile-pad {
     width: 100%;
   }
 
@@ -494,5 +609,12 @@ canvas {
   .save-toast {
     width: 100%;
     text-align: center;
+  }
+}
+
+@media (max-height: 760px) and (pointer: coarse) {
+  .touch-drag-hint,
+  .hud-skill-row--compact {
+    display: none;
   }
 }
