@@ -1,4 +1,4 @@
-const CACHE_VERSION = '8bit-legends-v1.6.2';
+const CACHE_VERSION = '8bit-legends-v1.6.3';
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
