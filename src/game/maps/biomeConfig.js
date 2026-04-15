@@ -20,9 +20,21 @@ export const BIOME_CONFIG = {
   7: { key: 'volcano_tileset', imageKey: 'tiles-volcano', name: 'volcano' },
   8: { key: 'volcano_tileset', imageKey: 'tiles-volcano', name: 'volcano' },
 
-  // Fases 9-10: Caverna Cristalina (final)
+  // Fases 9-10: Caverna Cristalina (final do bloco 1)
   9: { key: 'crystal_tileset', imageKey: 'tiles-crystal', name: 'crystal' },
   10: { key: 'crystal_tileset', imageKey: 'tiles-crystal', name: 'crystal' },
+
+  // ─── Bloco 11-15: Expansão 2 ─────────────────────────────────────────────
+  // Fases 11-12: Deserto (novo bioma)
+  11: { key: 'desert_tileset', imageKey: 'tiles-desert', name: 'desert' },
+  12: { key: 'desert_tileset', imageKey: 'tiles-desert', name: 'desert' },
+
+  // Fases 13-14: Masmorra (novo bioma)
+  13: { key: 'dungeon_tileset', imageKey: 'tiles-dungeon', name: 'dungeon' },
+  14: { key: 'dungeon_tileset', imageKey: 'tiles-dungeon', name: 'dungeon' },
+
+  // Fase 15: Trono do Abismo (clímax)
+  15: { key: 'abyss_tileset', imageKey: 'tiles-abyss', name: 'abyss' },
 };
 
 /**
@@ -43,6 +55,9 @@ export const getBiomeThemeColor = (phase) => {
     ruins: '#9b9b9b', // Cinza
     volcano: '#e67e22', // Laranja
     crystal: '#00b4d8', // Azul cristal
+    desert: '#d4a574', // Bege deserto
+    dungeon: '#4a3f35', // Marrom escuro
+    abyss: '#1a0033', // Roxo muito escuro
   };
 
   const biome = BIOME_CONFIG[phase]?.name || 'starter_field';

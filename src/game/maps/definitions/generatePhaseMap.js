@@ -25,7 +25,7 @@ const addBorder = (walls) => {
   }
 };
 
-// ─── 3 variantes de campo aberto (fases 1, 5, 9) ───────────────────────────
+// ─── 4 variantes de campo aberto (fases 1, 5, 9, 11) ────────────────────────
 
 const FIELD_LAYOUTS = [
   (walls) => {
@@ -58,9 +58,20 @@ const FIELD_LAYOUTS = [
     fillV(walls, 8, 15, 26);
     fillH(walls, 26, 25, 44);
   },
+  (walls) => {
+    // Campo D – fase 11 (Deserto): arena espaçada com obstáculos espalhados
+    addBorder(walls);
+    fillH(walls, 6, 8, 14);
+    fillV(walls, 18, 3, 12);
+    fillH(walls, 14, 22, 32);
+    fillV(walls, 28, 15, 24);
+    fillH(walls, 24, 4, 10);
+    fillH(walls, 20, 36, 44);
+    fillV(walls, 40, 8, 20);
+  },
 ];
 
-// ─── 2 variantes de corredor (fases 3, 7) ──────────────────────────────────
+// ─── 3 variantes de corredor (fases 3, 7, 13) ─────────────────────────────
 
 const CORRIDOR_LAYOUTS = [
   (walls) => {
@@ -84,24 +95,94 @@ const CORRIDOR_LAYOUTS = [
     fillH(walls, 14, 18, 30);
     fillH(walls, 22, 34, 45);
   },
+  (walls) => {
+    // Corredor C – fase 13 (Masmorra): labirinto com múltiplas divisórias
+    addBorder(walls);
+    // Linhas horizontais com brechas alternadas
+    for (let x = 2; x < W - 2; x++) {
+      if (x < 10 || x > 12) walls[8][x] = TILE_INDEX.WALL;
+      if (x < 20 || x > 22) walls[16][x] = TILE_INDEX.WALL;
+      if (x < 32 || x > 34) walls[24][x] = TILE_INDEX.WALL;
+    }
+    // Colunas verticais para criar compartimentos
+    fillV(walls, 12, 2, 7);
+    fillV(walls, 22, 9, 15);
+    fillV(walls, 34, 17, 23);
+    fillV(walls, 42, 2, 25);
+  },
 ];
 
-// ─── Arena de boss (fases pares) ───────────────────────────────────────────
+// ─── Variantes de arena de boss ────────────────────────────────────────────
 
-const buildArena = (walls) => {
+const buildArena = (walls, variant = 0) => {
   addBorder(walls);
-  // Quatro pilares nos cantos internos
-  [
-    [4, 4],
-    [4, W - 6],
-    [H - 6, 4],
-    [H - 6, W - 6],
-  ].forEach(([r, c]) => {
-    walls[r][c] = TILE_INDEX.WALL;
-    walls[r][c + 1] = TILE_INDEX.WALL;
-    walls[r + 1][c] = TILE_INDEX.WALL;
-    walls[r + 1][c + 1] = TILE_INDEX.WALL;
-  });
+  
+  if (variant === 0) {
+    // Arena padrão (fases 2, 4, 6, 8, 10)
+    // Quatro pilares nos cantos internos
+    [
+      [4, 4],
+      [4, W - 6],
+      [H - 6, 4],
+      [H - 6, W - 6],
+    ].forEach(([r, c]) => {
+      walls[r][c] = TILE_INDEX.WALL;
+      walls[r][c + 1] = TILE_INDEX.WALL;
+      walls[r + 1][c] = TILE_INDEX.WALL;
+      walls[r + 1][c + 1] = TILE_INDEX.WALL;
+    });
+  } else if (variant === 1) {
+    // Arena Deserto (fase 12): pilares no meio e nas extremidades
+    [
+      [6, 6],
+      [6, W - 8],
+      [H - 8, 6],
+      [H - 8, W - 8],
+      [H / 2 - 1, W / 2 - 2],
+      [H / 2 - 1, W / 2 + 2],
+    ].forEach(([r, c]) => {
+      if (r >= 0 && r < H && c >= 0 && c < W) {
+        walls[r][c] = TILE_INDEX.WALL;
+        if (c + 1 < W) walls[r][c + 1] = TILE_INDEX.WALL;
+      }
+    });
+  } else if (variant === 2) {
+    // Arena Masmorra (fase 14): pilares em padrão diagonal
+    const pillarPositions = [
+      [5, 5],
+      [5, W - 6],
+      [H - 6, 5],
+      [H - 6, W - 6],
+      [12, 12],
+      [12, W - 14],
+      [H - 14, 12],
+      [H - 14, W - 14],
+    ];
+    pillarPositions.forEach(([r, c]) => {
+      if (r >= 0 && r < H && c >= 0 && c < W) {
+        walls[r][c] = TILE_INDEX.WALL;
+        if (c + 1 < W) walls[r][c + 1] = TILE_INDEX.WALL;
+        if (r + 1 < H) walls[r + 1][c] = TILE_INDEX.WALL;
+        if (r + 1 < H && c + 1 < W) walls[r + 1][c + 1] = TILE_INDEX.WALL;
+      }
+    });
+  } else if (variant === 3) {
+    // Arena Abismo (fase 15, clímax): estrutura épica com múltiplos pilares
+    addBorder(walls);
+    // Padrão de grade de pilares para máxima dificuldade
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 3; j++) {
+        const r = 4 + i * 7;
+        const c = 4 + j * 14;
+        if (r < H - 2 && c < W - 2) {
+          walls[r][c] = TILE_INDEX.WALL;
+          walls[r][c + 1] = TILE_INDEX.WALL;
+          walls[r + 1][c] = TILE_INDEX.WALL;
+          walls[r + 1][c + 1] = TILE_INDEX.WALL;
+        }
+      }
+    }
+  }
 };
 
 // ─── Spawn points ───────────────────────────────────────────────────────────
@@ -137,37 +218,80 @@ const ARENA_SPAWNS = [
   { tileX: 24, tileY: 26 },
 ];
 
+const ABYSS_SPAWNS = [
+  // Fases 15 (clímax) tem mais spawn points e mais espaçados
+  { tileX: 8, tileY: 8 },
+  { tileX: 40, tileY: 8 },
+  { tileX: 8, tileY: 22 },
+  { tileX: 40, tileY: 22 },
+  { tileX: 24, tileY: 4 },
+  { tileX: 24, tileY: 26 },
+  { tileX: 5, tileY: 15 },
+  { tileX: 43, tileY: 15 },
+];
+
 // ─── Gerador principal ──────────────────────────────────────────────────────
 
 /**
  * Gera o mapa para a fase indicada.
- * Fases pares → arena de boss.
- * Fases 1/5/9 → campo aberto (variantes A/B/C).
- * Fases 3/7   → corredores (variantes A/B).
+ * Suporte para fases 1-15 com 3 blocos temáticos:
+ * - Bloco 1 (1-10): Clássico (Campo/Floresta/Ruínas/Vulcão/Cristal)
+ * - Bloco 2 (11-15): Deserto/Masmorra/Abismo
  */
 export const generatePhaseMap = (phase) => {
   const ground = create2D(W, H, TILE_INDEX.GRASS);
   const walls = create2D(W, H, -1);
 
-  const isBoss = phase % 2 === 0;
-
   let spawns;
+  let bossSpawn = null;
 
-  if (isBoss) {
-    buildArena(walls);
-    spawns = ARENA_SPAWNS;
-  } else {
-    // nonBossIdx: phase 1→0, 3→1, 5→2, 7→3, 9→4
-    const nbIdx = Math.floor((phase - 1) / 2);
-
-    if (nbIdx % 2 === 0) {
-      // Campo: variante 0 (fase1), 1 (fase5), 2 (fase9)
-      FIELD_LAYOUTS[Math.floor(nbIdx / 2)](walls);
+  // Lógica para fases 11-15 (novo bloco)
+  if (phase >= 11 && phase <= 15) {
+    if (phase === 11) {
+      // Fase 11: Campo do Deserto
+      FIELD_LAYOUTS[3](walls); // Variante D
       spawns = FIELD_SPAWNS;
-    } else {
-      // Corredor: variante 0 (fase3), 1 (fase7)
-      CORRIDOR_LAYOUTS[Math.floor((nbIdx - 1) / 2)](walls);
+    } else if (phase === 12) {
+      // Fase 12: Boss do Deserto
+      buildArena(walls, 1);
+      spawns = ARENA_SPAWNS;
+      bossSpawn = { tileX: Math.floor(W / 2), tileY: Math.floor(H / 2) };
+    } else if (phase === 13) {
+      // Fase 13: Masmorra (Corredor complexo)
+      CORRIDOR_LAYOUTS[2](walls); // Variante C
       spawns = CORRIDOR_SPAWNS;
+    } else if (phase === 14) {
+      // Fase 14: Boss da Masmorra
+      buildArena(walls, 2);
+      spawns = ARENA_SPAWNS;
+      bossSpawn = { tileX: Math.floor(W / 2), tileY: Math.floor(H / 2) };
+    } else if (phase === 15) {
+      // Fase 15: Clímax - Trono do Abismo
+      buildArena(walls, 3);
+      spawns = ABYSS_SPAWNS;
+      bossSpawn = { tileX: Math.floor(W / 2), tileY: Math.floor(H / 2) };
+    }
+  } else {
+    // Lógica original para fases 1-10
+    const isBoss = phase % 2 === 0;
+
+    if (isBoss) {
+      buildArena(walls, 0);
+      spawns = ARENA_SPAWNS;
+      bossSpawn = { tileX: Math.floor(W / 2), tileY: Math.floor(H / 2) };
+    } else {
+      // nonBossIdx: phase 1→0, 3→1, 5→2, 7→3, 9→4
+      const nbIdx = Math.floor((phase - 1) / 2);
+
+      if (nbIdx % 2 === 0) {
+        // Campo: variante 0 (fase1), 1 (fase5), 2 (fase9)
+        FIELD_LAYOUTS[Math.floor(nbIdx / 2)](walls);
+        spawns = FIELD_SPAWNS;
+      } else {
+        // Corredor: variante 0 (fase3), 1 (fase7)
+        CORRIDOR_LAYOUTS[Math.floor((nbIdx - 1) / 2)](walls);
+        spawns = CORRIDOR_SPAWNS;
+      }
     }
   }
 
@@ -179,8 +303,6 @@ export const generatePhaseMap = (phase) => {
     walls,
     spawn: { tileX: 3, tileY: 3 },
     enemySpawns: spawns,
-    bossSpawn: isBoss
-      ? { tileX: Math.floor(W / 2), tileY: Math.floor(H / 2) }
-      : null,
+    bossSpawn,
   };
 };
