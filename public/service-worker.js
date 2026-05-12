@@ -1,4 +1,4 @@
-const CACHE_VERSION = '8bit-legends-v1.6.3';
+const CACHE_VERSION = '8bit-legends-v1.6.4';
 const APP_SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -17,6 +17,7 @@ const APP_SHELL_FILES = [
   '/assets/tiles/biome_ruins.png',
   '/assets/tiles/biome_volcano.png',
   '/assets/tiles/biome_crystal.png',
+  '/assets/tiles/expanded_tileset.png',
   '/assets/sounds/click_003.ogg',
   '/assets/sounds/close_002.ogg',
   '/assets/sounds/confirmation_002.ogg',

@@ -1,4 +1,4 @@
-const DEFAULT_URL = 'ws://localhost:8080/8bit-legends';
+const DEFAULT_URL = import.meta.env.VITE_SOCKET_SYNC_URL?.trim() || null;
 
 /**
  * Base de sincronização futura via WebSocket.
@@ -12,7 +12,7 @@ export const createSocketSync = ({ stateStore, url = DEFAULT_URL }) => {
   const isSupported = () => typeof window !== 'undefined' && 'WebSocket' in window;
 
   const connect = () => {
-    if (!isSupported() || socket) {
+    if (!isSupported() || socket || !url) {
       return;
     }
 
