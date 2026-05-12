@@ -146,6 +146,7 @@ export class MainScene extends Phaser.Scene {
     this.load.image('tiles-ruins', '/assets/tiles/biome_ruins.png');
     this.load.image('tiles-volcano', '/assets/tiles/biome_volcano.png');
     this.load.image('tiles-crystal', '/assets/tiles/biome_crystal.png');
+    this.load.image('tiles-expanded', '/assets/tiles/expanded_tileset.png');
 
     this.load.image('arrow', '/assets/sprites/arrow.png');
     this.load.image('shield', '/assets/sprites/shield.png');

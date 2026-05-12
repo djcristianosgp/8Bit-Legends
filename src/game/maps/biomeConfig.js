@@ -26,15 +26,15 @@ export const BIOME_CONFIG = {
 
   // ─── Bloco 11-15: Expansão 2 ─────────────────────────────────────────────
   // Fases 11-12: Deserto (novo bioma)
-  11: { key: 'desert_tileset', imageKey: 'tiles-desert', name: 'desert' },
-  12: { key: 'desert_tileset', imageKey: 'tiles-desert', name: 'desert' },
+  11: { key: 'desert_tileset', imageKey: 'tiles-expanded', name: 'desert' },
+  12: { key: 'desert_tileset', imageKey: 'tiles-expanded', name: 'desert' },
 
   // Fases 13-14: Masmorra (novo bioma)
-  13: { key: 'dungeon_tileset', imageKey: 'tiles-dungeon', name: 'dungeon' },
-  14: { key: 'dungeon_tileset', imageKey: 'tiles-dungeon', name: 'dungeon' },
+  13: { key: 'dungeon_tileset', imageKey: 'tiles-expanded', name: 'dungeon' },
+  14: { key: 'dungeon_tileset', imageKey: 'tiles-expanded', name: 'dungeon' },
 
   // Fase 15: Trono do Abismo (clímax)
-  15: { key: 'abyss_tileset', imageKey: 'tiles-abyss', name: 'abyss' },
+  15: { key: 'abyss_tileset', imageKey: 'tiles-expanded', name: 'abyss' },
 };
 
 /**
